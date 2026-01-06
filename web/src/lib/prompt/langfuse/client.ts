@@ -3,14 +3,13 @@ import { env } from "@/lib/env";
 
 let langfuseClient: Langfuse | null = null;
 
-export function getLangfuseClient(): Langfuse {
+export function getLangfuseClient(): Langfuse | null {
   if (!langfuseClient) {
     const { publicKey, secretKey, baseUrl } = env.langfuse;
 
     if (!publicKey || !secretKey) {
-      throw new Error(
-        "Langfuse credentials not configured. Set LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY"
-      );
+      console.log("[Telemetry] Langfuse credentials not configured. Telemetry disabled.");
+      return null;
     }
 
     langfuseClient = new Langfuse({

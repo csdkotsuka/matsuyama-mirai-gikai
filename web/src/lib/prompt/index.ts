@@ -1,5 +1,6 @@
 import { getLangfuseClient } from "./langfuse/client";
 import { LangfusePromptProvider } from "./langfuse/langfuse-prompt-provider";
+import { FallbackPromptProvider } from "./fallback/fallback-prompt-provider";
 import type { PromptProvider } from "./interface/prompt-provider";
 
 /**
@@ -21,13 +22,14 @@ import type { PromptProvider } from "./interface/prompt-provider";
  * ```
  */
 export function createPromptProvider(): PromptProvider {
-  try {
-    const client = getLangfuseClient();
-    return new LangfusePromptProvider(client);
-  } catch (error) {
-    console.error("Failed to initialize Langfuse client:", error);
-    throw error;
+  const client = getLangfuseClient();
+
+  if (!client) {
+    console.log("[Prompt] Using fallback prompt provider (Langfuse not configured)");
+    return new FallbackPromptProvider();
   }
+
+  return new LangfusePromptProvider(client);
 }
 
 export type { CompiledPrompt, PromptVariables } from "./interface/types";

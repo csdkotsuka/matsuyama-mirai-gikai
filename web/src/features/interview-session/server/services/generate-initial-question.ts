@@ -48,7 +48,7 @@ export async function generateInitialQuestion({
 
     // メッセージ履歴なしで最初の質問を生成（構造化出力）
     const result = await generateText({
-      model: "openai/gpt-4o-mini",
+      model: "google/gemini-3-flash-preview",
       prompt: enhancedSystemPrompt,
       output: Output.object({ schema: interviewChatTextSchema }),
     });

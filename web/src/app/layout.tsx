@@ -23,10 +23,10 @@ const lexendGiga = Lexend_Giga({
   weight: ["400", "500", "700", "800", "900"],
 });
 
-const siteTitle = "みらい議会｜チームみらい";
+const siteTitle = "松山みらい議会｜チームみらい";
 const siteDescription =
   "国会で今どんな法案が検討されているか、わかりやすく伝えるプラットフォーム";
-const siteName = "みらい議会";
+const siteName = "松山みらい議会";
 const ogImage = {
   url: "/ogp.jpg",
   width: 1200,
@@ -73,7 +73,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#2aa693",
+  themeColor: "#FF8C00",
 };
 
 export default function RootLayout({
@@ -86,7 +86,7 @@ export default function RootLayout({
       <body
         className={`${notoSansJP.variable} ${lexendGiga.variable} font-sans antialiased bg-[#EEEEEE]`}
       >
-        <NextTopLoader showSpinner={false} color="#2aa693" />
+        <NextTopLoader showSpinner={false} color="#FF8C00" />
         <SpeedInsights />
         <GoogleAnalytics gaId={env.analytics.gaTrackingId ?? ""} />
         <RubyfulInitializer />

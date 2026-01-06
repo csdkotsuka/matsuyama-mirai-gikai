@@ -41,6 +41,35 @@ export default async function Home() {
       {/* 本日の国会セクション */}
       <CurrentDietSession session={currentSession} />
 
+      {/* 松山市議会セクション */}
+      <Container className="py-12 bg-white">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold mb-2">松山市議会</h2>
+          <p className="text-gray-600">地方議会の会議録もご覧いただけます</p>
+        </div>
+        <div className="flex justify-center">
+          <a
+            href="/councils/matsuyama"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-full font-bold hover:opacity-90 transition-opacity"
+          >
+            松山市議会の会議録を見る
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </a>
+        </div>
+      </Container>
+
       {/* 議案一覧セクション */}
       <Container className="pb-20">
         <div className="py-8">

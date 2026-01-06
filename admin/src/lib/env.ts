@@ -17,6 +17,7 @@ export const env = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   revalidateSecret: process.env.REVALIDATE_SECRET,
+  googleGenerativeAiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 } as const;
 
 // 型定義

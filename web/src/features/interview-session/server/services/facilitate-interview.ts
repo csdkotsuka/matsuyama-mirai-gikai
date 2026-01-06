@@ -88,7 +88,7 @@ ${stageGuidance}
     .join("\n");
 
   const result = await generateText({
-    model: "openai/gpt-4o-mini",
+    model: "google/gemini-3-flash-preview",
     prompt: `${facilitatorPrompt}\n\n# 会話履歴\n${conversationText}`,
     output: Output.object({ schema: facilitatorResultSchema }),
   });

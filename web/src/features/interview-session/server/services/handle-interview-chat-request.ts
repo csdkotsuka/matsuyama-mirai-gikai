@@ -66,10 +66,10 @@ export async function handleInterviewChatRequest({
   const systemPrompt = isSummaryPhase
     ? buildSummarySystemPrompt({ bill, interviewConfig })
     : buildInterviewSystemPrompt({
-        bill,
-        interviewConfig,
-        questions: await getInterviewQuestions(interviewConfig.id),
-      });
+      bill,
+      interviewConfig,
+      questions: await getInterviewQuestions(interviewConfig.id),
+    });
 
   // ストリーミングレスポンスを生成
   return generateStreamingResponse({
@@ -94,7 +94,7 @@ async function generateStreamingResponse({
   sessionId: string;
   isSummaryPhase: boolean;
 }) {
-  const model = "openai/gpt-4o-mini";
+  const model = "google/gemini-3-flash-preview";
 
   const handleError = (error: unknown) => {
     console.error("LLM generation error:", error);

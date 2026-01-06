@@ -485,6 +485,51 @@ export type Database = {
           },
         ]
       }
+      meetings: {
+        Row: {
+          council_name: string
+          created_at: string
+          embedding: string | null
+          external_id: string | null
+          id: string
+          meeting_name: string
+          meeting_type: string
+          session_date: string
+          session_number: number | null
+          source_url: string | null
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          council_name: string
+          created_at?: string
+          embedding?: string | null
+          external_id?: string | null
+          id?: string
+          meeting_name: string
+          meeting_type: string
+          session_date: string
+          session_number?: number | null
+          source_url?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          council_name?: string
+          created_at?: string
+          embedding?: string | null
+          external_id?: string | null
+          id?: string
+          meeting_name?: string
+          meeting_type?: string
+          session_date?: string
+          session_number?: number | null
+          source_url?: string | null
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mirai_stances: {
         Row: {
           bill_id: string
@@ -581,6 +626,53 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      utterances: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          meeting_id: string
+          page_number: number | null
+          sequence_number: number
+          speaker_name: string
+          speaker_role: string | null
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          meeting_id: string
+          page_number?: number | null
+          sequence_number: number
+          speaker_name: string
+          speaker_role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          meeting_id?: string
+          page_number?: number | null
+          sequence_number?: number
+          speaker_name?: string
+          speaker_role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utterances_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

@@ -16,8 +16,7 @@ export function Hero() {
       <div className="absolute bottom-[30vh] left-0 right-0 py-4">
         <Container>
           <p className="font-bold text-xl md:text-2xl leading-relaxed">
-            いま国会で議論されていること <br />
-            やさしい言葉で説明します
+            松山市の未来を、テクノロジーで可視化する
           </p>
           <p className="mt-2 font-lexend text-xs">powered by Team Mirai & AI</p>
         </Container>

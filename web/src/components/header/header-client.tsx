@@ -31,11 +31,11 @@ export function HeaderClient({ difficultyLevel }: HeaderClientProps) {
             >
               <Image
                 src="/img/logo.svg"
-                alt="みらい議会"
+                alt="松山みらい議会"
                 width={42}
                 height={36}
               />
-              <div className="text-xl font-bold">みらい議会</div>
+              <div className="text-xl font-bold">松山みらい議会</div>
             </Link>
           </div>
 
