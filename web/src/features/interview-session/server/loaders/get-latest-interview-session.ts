@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { getChatSupabaseUser } from "@/features/chat/server/utils/supabase-server";
 
 export type InterviewSessionStatus = "active" | "completed" | "none";
@@ -29,34 +29,52 @@ export async function getLatestInterviewSession(
     return null;
   }
 
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
 
-  // アーカイブされていない最新のセッションを取得（完了済みも含む）
-  const { data: session, error } = await supabase
-    .from("interview_sessions")
-    .select("id, completed_at, interview_report(id)")
-    .eq("interview_config_id", interviewConfigId)
-    .eq("user_id", user.id)
-    .is("archived_at", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const snapshot = await db
+      .collection("interview_sessions")
+      .where("interview_config_id", "==", interviewConfigId)
+      .where("user_id", "==", user.id)
+      .get();
 
-  if (error) {
+    const activeOrCompleted = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+      .filter((s: any) => !s.archived_at) as any[];
+
+    if (activeOrCompleted.length === 0) {
+      return null;
+    }
+
+    activeOrCompleted.sort((a, b) =>
+      (b.created_at || "").localeCompare(a.created_at || "")
+    );
+
+    const latest = activeOrCompleted[0];
+    const isCompleted = Boolean(latest.completed_at);
+
+    let reportId: string | null = null;
+    if (isCompleted) {
+      const reportSnap = await db
+        .collection("interview_reports")
+        .where("interview_session_id", "==", latest.id)
+        .limit(1)
+        .get();
+      if (!reportSnap.empty) {
+        reportId = reportSnap.docs[0].id;
+      }
+    }
+
+    return {
+      id: latest.id,
+      status: isCompleted ? "completed" : "active",
+      reportId,
+    };
+  } catch (error) {
     console.error("Failed to fetch latest interview session:", error);
     return null;
   }
-
-  if (!session) {
-    return null;
-  }
-
-  const isCompleted = session.completed_at !== null;
-  const report = session.interview_report as { id: string } | null;
-
-  return {
-    id: session.id,
-    status: isCompleted ? "completed" : "active",
-    reportId: report?.id ?? null,
-  };
 }

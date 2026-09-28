@@ -1,14 +1,10 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { getDifficultyLevel } from "@/features/bill-difficulty/server/loaders/get-difficulty-level";
 import type { DifficultyLevelEnum } from "@/features/bill-difficulty/shared/types";
 import { CACHE_TAGS } from "@/lib/cache-tags";
-import type { BillWithContent } from "../../shared/types";
-import { fetchTagsByBillIds } from "./helpers/get-bill-tags";
+import type { BillWithContent, BillContent } from "../../shared/types";
 
-/**
- * 国会会期IDに紐づく議案一覧を取得
- */
 export async function getBillsByDietSession(
   dietSessionId: string
 ): Promise<BillWithContent[]> {
@@ -21,61 +17,65 @@ const _getCachedBillsByDietSession = unstable_cache(
     dietSessionId: string,
     difficultyLevel: DifficultyLevelEnum
   ): Promise<BillWithContent[]> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
 
-    // 会期IDに紐づく公開済み議案を取得
-    const { data, error } = await supabase
-      .from("bills")
-      .select(
-        `
-        *,
-        bill_contents!inner (
-          id,
-          bill_id,
-          title,
-          summary,
-          content,
-          difficulty_level,
-          created_at,
-          updated_at
-        )
-      `
-      )
-      .eq("diet_session_id", dietSessionId)
-      .eq("publish_status", "published")
-      .eq("bill_contents.difficulty_level", difficultyLevel)
-      .order("published_at", { ascending: false });
+      const [billsSnap, contentsSnap, tagsSnap] = await Promise.all([
+        db
+          .collection("bills")
+          .where("diet_session_id", "==", dietSessionId)
+          .where("publish_status", "==", "published")
+          .get(),
+        db
+          .collection("bill_contents")
+          .where("difficulty_level", "==", difficultyLevel)
+          .get(),
+        db.collection("tags").get(),
+      ]);
 
-    if (error) {
+      const contentMap = new Map<string, BillContent>();
+      contentsSnap.docs.forEach((doc) => {
+        const data = doc.data() as BillContent;
+        contentMap.set(data.bill_id, { ...data, id: doc.id });
+      });
+
+      const tagMap = new Map<string, { id: string; label: string }>();
+      tagsSnap.docs.forEach((doc) => {
+        tagMap.set(doc.id, { id: doc.id, label: doc.data().label });
+      });
+
+      const bills: BillWithContent[] = billsSnap.docs.map((doc) => {
+        const data = doc.data();
+        const tagIds: string[] = Array.isArray(data.tag_ids)
+          ? data.tag_ids
+          : [];
+        const tags = tagIds
+          .map((id) => tagMap.get(id))
+          .filter(Boolean) as Array<{ id: string; label: string }>;
+
+        return {
+          id: doc.id,
+          ...data,
+          bill_content: contentMap.get(doc.id),
+          tags,
+        } as BillWithContent;
+      });
+
+      bills.sort((a, b) =>
+        (b.published_at || "").localeCompare(a.published_at || "")
+      );
+
+      return bills;
+    } catch (error: any) {
+      console.error("Failed to fetch bills by diet session:", error);
       throw new Error(
         `Failed to fetch bills by diet session: ${error.message}`
       );
     }
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    // タグ情報を一括取得
-    const billIds = data.map((item) => item.id);
-    const tagsByBillId = await fetchTagsByBillIds(supabase, billIds);
-
-    const billsWithContent: BillWithContent[] = data.map((item) => {
-      const { bill_contents, ...bill } = item;
-      return {
-        ...bill,
-        bill_content: Array.isArray(bill_contents)
-          ? bill_contents[0]
-          : undefined,
-        tags: tagsByBillId.get(item.id) ?? [],
-      };
-    });
-
-    return billsWithContent;
   },
   ["bills-by-diet-session"],
   {
-    revalidate: 600, // 10分
+    revalidate: 600,
     tags: [CACHE_TAGS.BILLS],
   }
 );

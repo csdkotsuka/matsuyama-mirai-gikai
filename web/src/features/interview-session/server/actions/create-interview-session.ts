@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { getChatSupabaseUser } from "@/features/chat/server/utils/supabase-server";
 import type { InterviewSession } from "../../shared/types";
 
@@ -9,33 +9,41 @@ export async function createInterviewSession({
 }: {
   interviewConfigId: string;
 }): Promise<InterviewSession> {
-  // 認可処理
   const {
     data: { user },
-    error: getUserError,
   } = await getChatSupabaseUser();
 
-  if (getUserError || !user) {
-    throw new Error(
-      `Failed to get user: ${getUserError?.message || "User not found"}`
-    );
+  if (!user) {
+    throw new Error("User not found");
   }
 
-  const supabase = createAdminClient();
+  const db = getAdminFirestore();
 
-  const { data, error } = await supabase
-    .from("interview_sessions")
-    .insert({
-      interview_config_id: interviewConfigId,
-      user_id: user.id,
-      started_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  // interview_config から bill_id を取得
+  const configDoc = await db
+    .collection("interview_configs")
+    .doc(interviewConfigId)
+    .get();
+  const billId = configDoc.exists ? configDoc.data()?.bill_id : "";
 
-  if (error) {
-    throw new Error(`Failed to create interview session: ${error.message}`);
-  }
+  const docRef = db.collection("interview_sessions").doc();
+  const now = new Date().toISOString();
 
-  return data;
+  const sessionData = {
+    id: docRef.id,
+    interview_config_id: interviewConfigId,
+    bill_id: billId,
+    user_id: user.id,
+    user_identifier: user.id,
+    started_at: now,
+    created_at: now,
+    updated_at: now,
+    completed_at: null,
+    archived_at: null,
+    is_public_by_user: false,
+  };
+
+  await docRef.set(sessionData);
+
+  return sessionData as InterviewSession;
 }

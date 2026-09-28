@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import type { InterviewSession } from "../../shared/types";
 import {
   getAuthenticatedUser,
@@ -26,39 +26,46 @@ export async function getInterviewSessionById(
   }
 
   const { userId } = authResult;
-  const supabase = createAdminClient();
 
-  // セッションとinterview_configを結合して取得
-  const { data: session, error: sessionError } = await supabase
-    .from("interview_sessions")
-    .select("*, interview_configs(bill_id)")
-    .eq("id", sessionId)
-    .single();
+  try {
+    const db = getAdminFirestore();
+    const sessionDoc = await db
+      .collection("interview_sessions")
+      .doc(sessionId)
+      .get();
 
-  if (sessionError || !session) {
-    console.error("Failed to fetch interview session:", sessionError);
+    if (!sessionDoc.exists) {
+      console.error("Interview session not found:", sessionId);
+      return null;
+    }
+
+    const sessionData = sessionDoc.data() as any;
+
+    // 認可チェック: セッションの所有者と現在のユーザーが一致するか
+    if (!isSessionOwner(sessionData.user_id, userId)) {
+      console.error("Unauthorized access to interview session");
+      return null;
+    }
+
+    const configDoc = await db
+      .collection("interview_configs")
+      .doc(sessionData.interview_config_id)
+      .get();
+
+    if (!configDoc.exists) {
+      console.error("Interview config not found for session");
+      return null;
+    }
+
+    const configData = configDoc.data() as any;
+
+    return {
+      id: sessionDoc.id,
+      ...sessionData,
+      bill_id: configData.bill_id,
+    };
+  } catch (error) {
+    console.error("Failed to fetch interview session:", error);
     return null;
   }
-
-  // 認可チェック: セッションの所有者と現在のユーザーが一致するか
-  if (!isSessionOwner(session.user_id, userId)) {
-    console.error("Unauthorized access to interview session");
-    return null;
-  }
-
-  // interview_configsからbill_idを抽出
-  const interviewConfig = session.interview_configs as {
-    bill_id: string;
-  } | null;
-  if (!interviewConfig) {
-    console.error("Interview config not found for session");
-    return null;
-  }
-
-  // セッションデータを返す（bill_idを追加）
-  const { interview_configs: _, ...sessionData } = session;
-  return {
-    ...sessionData,
-    bill_id: interviewConfig.bill_id,
-  };
 }

@@ -38,4 +38,20 @@ export const BILL_STATUS_CONFIG: Record<
     icon: XCircle,
     color: "text-red-600 bg-red-50",
   },
+  coming_soon: {
+    icon: Clock,
+    color: "text-purple-600 bg-purple-50",
+  },
+  in_other_house: {
+    icon: AlertCircle,
+    color: "text-orange-600 bg-orange-50",
+  },
+  withdrawn: {
+    icon: XCircle,
+    color: "text-gray-600 bg-gray-50",
+  },
+  continued: {
+    icon: Clock,
+    color: "text-amber-600 bg-amber-50",
+  },
 };

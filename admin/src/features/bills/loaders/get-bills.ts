@@ -1,17 +1,19 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
-import type { Bill } from "../types";
+import { getAdminFirestore, type Bill } from "@mirai-gikai/firebase";
 
 export async function getBills(): Promise<Bill[]> {
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    const snapshot = await db
+      .collection("bills")
+      .orderBy("created_at", "desc")
+      .get();
 
-  const { data, error } = await supabase
-    .from("bills")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<Bill, "id">),
+    }));
+  } catch (error: any) {
+    console.error("Failed to get bills:", error);
     throw new Error(`議案の取得に失敗しました: ${error.message}`);
   }
-
-  return data || [];
 }

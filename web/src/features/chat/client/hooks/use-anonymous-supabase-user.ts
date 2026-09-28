@@ -1,49 +1,50 @@
 "use client";
 
-import { createBrowserClient } from "@mirai-gikai/supabase";
 import { useEffect, useState } from "react";
+import { nanoid } from "nanoid";
 
-// Create a singleton Supabase client with persistent session
-const supabase = createBrowserClient();
+const COOKIE_NAME = "anonymous_user_id";
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+function setCookie(name: string, value: string, days = 365) {
+  if (typeof document === "undefined") return;
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
 
 /**
- * Hook to ensure an anonymous Supabase user exists and return the user ID
- * This will automatically create an anonymous user if none exists
+ * 匿名ユーザーIDをCookie/LocalStorageで永続化して取得するフック
  */
 export function useAnonymousSupabaseUser() {
   const [userId, setUserId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    const ensureAnonUser = async () => {
-      try {
-        // Check if user already exists
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          setUserId(user.id);
-          return;
-        }
-
-        // No valid session -> sign in anonymously
-        const { data, error: signInError } =
-          await supabase.auth.signInAnonymously();
-
-        if (signInError) {
-          console.error("Error creating anonymous user:", signInError);
-          return;
-        }
-
-        if (data.user) {
-          setUserId(data.user.id);
-        }
-      } catch (err) {
-        console.error("Error ensuring anonymous user:", err);
+    try {
+      let id = getCookie(COOKIE_NAME);
+      if (!id && typeof window !== "undefined") {
+        id = localStorage.getItem(COOKIE_NAME);
       }
-    };
 
-    ensureAnonUser();
+      if (!id) {
+        id = `anon_${nanoid(21)}`;
+      }
+
+      setCookie(COOKIE_NAME, id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(COOKIE_NAME, id);
+      }
+
+      setUserId(id);
+    } catch (err) {
+      console.error("Error setting anonymous user:", err);
+      const fallback = `anon_${nanoid(21)}`;
+      setUserId(fallback);
+    }
   }, []);
 
   return userId;

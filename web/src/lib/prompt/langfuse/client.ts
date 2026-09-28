@@ -8,7 +8,9 @@ export function getLangfuseClient(): Langfuse | null {
     const { publicKey, secretKey, baseUrl } = env.langfuse;
 
     if (!publicKey || !secretKey) {
-      console.log("[Telemetry] Langfuse credentials not configured. Telemetry disabled.");
+      console.log(
+        "[Telemetry] Langfuse credentials not configured. Telemetry disabled."
+      );
       return null;
     }
 

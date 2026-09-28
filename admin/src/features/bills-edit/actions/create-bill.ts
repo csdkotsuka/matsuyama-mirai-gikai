@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
@@ -14,24 +14,24 @@ export async function createBill(input: BillCreateInput) {
     // バリデーション
     const validatedData = billCreateSchema.parse(input);
 
+    const now = new Date().toISOString();
     const insertData = {
       ...validatedData,
       published_at: validatedData.published_at
         ? new Date(validatedData.published_at).toISOString()
         : null,
+      publish_status: "draft" as const,
+      tag_ids: [],
+      created_at: now,
+      updated_at: now,
     };
 
-    // Supabaseに挿入
-    const supabase = createAdminClient();
-    const { error } = await supabase
-      .from("bills")
-      .insert(insertData)
-      .select("id")
-      .single();
-
-    if (error) {
-      throw new Error(`議案の作成に失敗しました: ${error.message}`);
-    }
+    const db = getAdminFirestore();
+    const docRef = db.collection("bills").doc();
+    await docRef.set({
+      ...insertData,
+      id: docRef.id,
+    });
 
     // web側のキャッシュを無効化
     await invalidateWebCache();

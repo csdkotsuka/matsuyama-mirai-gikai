@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { DietSession } from "../../shared/types";
@@ -14,27 +14,28 @@ export async function getPreviousDietSession(): Promise<DietSession | null> {
 
 const _getCachedPreviousDietSession = unstable_cache(
   async (): Promise<DietSession | null> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
 
-    // 最新2件のセッションを取得
-    const { data, error } = await supabase
-      .from("diet_sessions")
-      .select("*")
-      .order("start_date", { ascending: false })
-      .limit(2);
+      const snapshot = await db
+        .collection("diet_sessions")
+        .orderBy("start_date", "desc")
+        .limit(2)
+        .get();
 
-    if (error) {
+      if (snapshot.size < 2) {
+        return null;
+      }
+
+      const doc = snapshot.docs[1];
+      return {
+        id: doc.id,
+        ...doc.data(),
+      } as DietSession;
+    } catch (error) {
       console.error("Failed to fetch previous diet session:", error);
       return null;
     }
-
-    // 2つ以上のセッションがない場合はnullを返す
-    if (!data || data.length < 2) {
-      return null;
-    }
-
-    // 2番目のセッション（前回のセッション）を返す
-    return data[1];
   },
   ["previous-diet-session"],
   {

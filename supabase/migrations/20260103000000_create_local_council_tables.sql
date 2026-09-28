@@ -1,3 +1,6 @@
+
+
+
 -- Create tables for local council meeting records
 
 -- 会議テーブル

@@ -45,7 +45,7 @@ const ORIGINATING_HOUSE_OPTIONS = Object.entries(HOUSE_LABELS).map(
 );
 
 interface BillFormFieldsProps {
-  control: Control<BillCreateInput>;
+  control: Control<any>;
   billId?: string;
   dietSessions: DietSession[];
 }

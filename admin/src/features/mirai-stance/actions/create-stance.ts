@@ -1,23 +1,23 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
 import type { StanceInput } from "../types";
 
 export async function createStance(billId: string, data: StanceInput) {
   try {
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
+    const docRef = db.collection("mirai_stances").doc();
+    const now = new Date().toISOString();
 
-    const { error } = await supabase.from("mirai_stances").insert({
+    await docRef.set({
+      id: docRef.id,
       bill_id: billId,
       type: data.type,
       comment: data.comment || null,
+      created_at: now,
+      updated_at: now,
     });
-
-    if (error) {
-      console.error("Error creating stance:", error);
-      throw new Error("スタンスの作成に失敗しました");
-    }
 
     invalidateWebCache();
     return { success: true };

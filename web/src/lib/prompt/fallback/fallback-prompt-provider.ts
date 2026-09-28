@@ -6,13 +6,13 @@ import type { CompiledPrompt, PromptVariables } from "../interface/types";
  * 静的なプロンプトを返す
  */
 export class FallbackPromptProvider implements PromptProvider {
-    async getPrompt(
-        name: string,
-        variables?: PromptVariables
-    ): Promise<CompiledPrompt> {
-        // デフォルトのプロンプトを返す
-        const defaultPrompts: Record<string, string> = {
-            "chat-system": `あなたは地方議会の情報を提供するAIアシスタントです。
+  async getPrompt(
+    name: string,
+    variables?: PromptVariables
+  ): Promise<CompiledPrompt> {
+    // デフォルトのプロンプトを返す
+    const defaultPrompts: Record<string, string> = {
+      "chat-system": `あなたは地方議会の情報を提供するAIアシスタントです。
 ユーザーの質問に対して、議会の会議録データベースから関連する情報を検索し、
 正確で分かりやすい回答を提供してください。
 
@@ -21,17 +21,17 @@ export class FallbackPromptProvider implements PromptProvider {
 - 情報源を明示する
 - 不明な点は推測せず、正直に「わかりません」と答える
 - 専門用語は分かりやすく説明する`,
-        };
+    };
 
-        const content = defaultPrompts[name] || `System prompt for ${name}`;
+    const content = defaultPrompts[name] || `System prompt for ${name}`;
 
-        return {
-            content,
-            metadata: JSON.stringify({
-                name,
-                version: "fallback",
-                type: "text",
-            }),
-        };
-    }
+    return {
+      content,
+      metadata: JSON.stringify({
+        name,
+        version: "fallback",
+        type: "text",
+      }),
+    };
+  }
 }

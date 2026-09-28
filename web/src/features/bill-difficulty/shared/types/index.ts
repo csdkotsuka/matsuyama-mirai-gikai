@@ -1,8 +1,5 @@
-import type { Database } from "@mirai-gikai/supabase";
-
 // 難易度レベルのEnum
-export type DifficultyLevelEnum =
-  Database["public"]["Enums"]["difficulty_level_enum"];
+export type DifficultyLevelEnum = "normal" | "hard";
 
 // 難易度のラベル
 export const DIFFICULTY_LABELS: Record<DifficultyLevelEnum, string> = {

@@ -11,11 +11,11 @@ export function useLogout() {
     try {
       setIsLoading(true);
       await signOut();
-      router.push("/login");
+      window.location.href = "/login";
     } catch (err) {
       console.error("Logout failed:", err);
       // Even if logout fails on server, redirect to login
-      router.push("/login");
+      window.location.href = "/login";
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
 import { type InterviewConfigInput, interviewConfigSchema } from "../types";
@@ -19,37 +19,41 @@ export async function upsertInterviewConfig(
     // バリデーション
     const validatedData = interviewConfigSchema.parse(input);
 
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
+    const existing = await db
+      .collection("interview_configs")
+      .where("bill_id", "==", billId)
+      .limit(1)
+      .get();
 
-    // upsert実行
-    const { data, error } = await supabase
-      .from("interview_configs")
-      .upsert(
-        {
-          bill_id: billId,
-          status: validatedData.status,
-          themes: validatedData.themes || null,
-          knowledge_source: validatedData.knowledge_source || null,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "bill_id",
-        }
-      )
-      .select()
-      .single();
+    const now = new Date().toISOString();
+    const configData = {
+      bill_id: billId,
+      status: validatedData.status,
+      themes: validatedData.themes || [],
+      knowledge_source: validatedData.knowledge_source || null,
+      updated_at: now,
+    };
 
-    if (error) {
-      return {
-        success: false,
-        error: `インタビュー設定の保存に失敗しました: ${error.message}`,
-      };
+    let id: string;
+    if (!existing.empty) {
+      const doc = existing.docs[0];
+      id = doc.id;
+      await doc.ref.update(configData);
+    } else {
+      const docRef = db.collection("interview_configs").doc();
+      id = docRef.id;
+      await docRef.set({
+        ...configData,
+        id,
+        created_at: now,
+      });
     }
 
     // web側のキャッシュを無効化
     await invalidateWebCache();
 
-    return { success: true, data: { id: data.id } };
+    return { success: true, data: { id } };
   } catch (error) {
     console.error("Upsert interview config error:", error);
     if (error instanceof Error) {

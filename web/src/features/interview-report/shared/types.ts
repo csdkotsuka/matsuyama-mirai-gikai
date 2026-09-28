@@ -1,6 +1,7 @@
-import type { Database } from "@mirai-gikai/supabase";
+import type { InterviewReport } from "@mirai-gikai/firebase";
 
-export type InterviewReport =
-  Database["public"]["Tables"]["interview_report"]["Row"];
-export type InterviewReportInsert =
-  Database["public"]["Tables"]["interview_report"]["Insert"];
+export type { InterviewReport };
+export type InterviewReportInsert = Omit<
+  InterviewReport,
+  "id" | "created_at" | "updated_at"
+>;

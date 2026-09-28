@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Clock, MessageCircle, User } from "lucide-react";
+import { Clock, MessageCircle } from "lucide-react";
 import type { InterviewSessionDetail } from "../types";
 import { formatDuration, getSessionStatus } from "../types";
 import { SessionStatusBadge } from "./session-status-badge";
@@ -19,8 +19,10 @@ interface SessionDetailProps {
 }
 
 export function SessionDetail({ session }: SessionDetailProps) {
+  const startedAt =
+    session.started_at || session.created_at || new Date().toISOString();
   const status = getSessionStatus(session);
-  const duration = formatDuration(session.started_at, session.completed_at);
+  const duration = formatDuration(startedAt, session.completed_at);
   const report = session.interview_report;
   const messages = session.interview_messages;
 
@@ -47,7 +49,7 @@ export function SessionDetail({ session }: SessionDetailProps) {
               <div className="text-sm text-gray-500">開始時刻</div>
               <div className="flex items-center gap-1 text-sm">
                 <Clock className="h-4 w-4 text-gray-400" />
-                {new Date(session.started_at).toLocaleString("ja-JP")}
+                {new Date(startedAt).toLocaleString("ja-JP")}
               </div>
             </div>
             <div>
@@ -57,7 +59,7 @@ export function SessionDetail({ session }: SessionDetailProps) {
             <div>
               <div className="text-sm text-gray-500">ユーザーID</div>
               <div className="font-mono text-sm text-gray-600">
-                {session.user_id}
+                {session.user_id || session.user_identifier || "-"}
               </div>
             </div>
             <div>
@@ -71,74 +73,69 @@ export function SessionDetail({ session }: SessionDetailProps) {
         </CardContent>
       </Card>
 
-      {/* レポート情報 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">レポート</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {report ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {/* インタビューレポート */}
+      {report && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">インタビューレポート</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <div className="text-sm text-gray-500 mb-1">スタンス</div>
                 <div>
-                  <div className="text-sm text-gray-500">スタンス</div>
-                  <div className="mt-1">
-                    <StanceBadge stance={report.stance} />
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">役割</div>
-                  <div className="flex items-center gap-1 text-sm">
-                    <User className="h-4 w-4 text-gray-400" />
-                    {report.role || "-"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">役割の説明</div>
-                  <div className="text-sm">
-                    {report.role_description || "-"}
-                  </div>
+                  <StanceBadge stance={report.stance ?? null} />
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-500 mb-1">要約</div>
-                <div className="text-sm bg-gray-50 p-3 rounded-lg">
-                  {report.summary || "-"}
+                <div className="text-sm text-gray-500 mb-1">役割</div>
+                <div className="text-sm font-medium">{report.role || "-"}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500 mb-1">役割の説明</div>
+                <div className="text-sm text-gray-700">
+                  {report.role_description || "-"}
                 </div>
               </div>
-              {report.opinions && (
-                <div>
-                  <div className="text-sm text-gray-500 mb-1">意見</div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <pre className="text-sm whitespace-pre-wrap">
-                      {JSON.stringify(report.opinions, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
             </div>
-          ) : (
-            <div className="text-gray-500 text-sm">
-              レポートはまだ生成されていません
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* チャット生データ */}
+            {report.summary && (
+              <div>
+                <div className="text-sm text-gray-500 mb-1">要約</div>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                  {report.summary}
+                </p>
+              </div>
+            )}
+
+            {report.opinions && (
+              <div>
+                <div className="text-sm text-gray-500 mb-1">意見詳細</div>
+                <div className="bg-gray-50 p-4 rounded-md text-sm">
+                  <pre className="whitespace-pre-wrap font-sans">
+                    {JSON.stringify(report.opinions, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* メッセージ履歴 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">チャット履歴</CardTitle>
+          <CardTitle className="text-lg">メッセージ履歴</CardTitle>
         </CardHeader>
         <CardContent>
           {messages.length > 0 ? (
-            <div className="rounded-lg border overflow-hidden">
+            <div className="border rounded-md">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="w-24">役割</TableHead>
+                  <TableRow>
+                    <TableHead className="w-20">送信者</TableHead>
                     <TableHead>内容</TableHead>
-                    <TableHead className="w-44">時刻</TableHead>
+                    <TableHead className="w-40">送信時刻</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -160,7 +157,9 @@ export function SessionDetail({ session }: SessionDetailProps) {
                         {message.content}
                       </TableCell>
                       <TableCell className="text-gray-500 text-sm">
-                        {new Date(message.created_at).toLocaleString("ja-JP")}
+                        {message.created_at
+                          ? new Date(message.created_at).toLocaleString("ja-JP")
+                          : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

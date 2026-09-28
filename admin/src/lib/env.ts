@@ -3,19 +3,12 @@
  * アプリケーション全体で使用する環境変数を一元管理
  */
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error("環境変数 NEXT_PUBLIC_SUPABASE_URL が設定されていません");
-}
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  throw new Error(
-    "環境変数 NEXT_PUBLIC_SUPABASE_ANON_KEY が設定されていません"
-  );
-}
-
 export const env = {
   webUrl: process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000",
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  firebaseProjectId:
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    process.env.FIREBASE_PROJECT_ID ||
+    "miraigikai",
   revalidateSecret: process.env.REVALIDATE_SECRET,
   googleGenerativeAiApiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
 } as const;

@@ -1,19 +1,20 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
-import type { Bill } from "../types";
+import { getAdminFirestore, type Bill } from "@mirai-gikai/firebase";
 
 export async function getBillById(id: string): Promise<Bill | null> {
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    const docSnap = await db.collection("bills").doc(id).get();
 
-  const { data, error } = await supabase
-    .from("bills")
-    .select("*")
-    .eq("id", id)
-    .single();
+    if (!docSnap.exists) {
+      return null;
+    }
 
-  if (error) {
+    return {
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<Bill, "id">),
+    };
+  } catch (error) {
     console.error("Failed to fetch bill:", error);
     return null;
   }
-
-  return data;
 }

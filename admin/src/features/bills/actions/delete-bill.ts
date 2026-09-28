@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 
@@ -8,14 +8,31 @@ export async function deleteBill(id: string) {
   try {
     await requireAdmin();
 
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
 
-    // 議案を削除
-    const { error } = await supabase.from("bills").delete().eq("id", id);
+    // 議案ドキュメントの削除
+    await db.collection("bills").doc(id).delete();
 
-    if (error) {
-      throw new Error(`議案の削除に失敗しました: ${error.message}`);
-    }
+    // 関連する bill_contents も削除
+    const contentsSnap = await db
+      .collection("bill_contents")
+      .where("bill_id", "==", id)
+      .get();
+    const batch = db.batch();
+    contentsSnap.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    // 関連する mirai_stances も削除
+    const stancesSnap = await db
+      .collection("mirai_stances")
+      .where("bill_id", "==", id)
+      .get();
+    stancesSnap.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
 
     // キャッシュをリフレッシュ
     revalidatePath("/bills");

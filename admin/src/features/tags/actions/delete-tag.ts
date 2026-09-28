@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
 import type { DeleteTagInput } from "../types";
@@ -9,16 +9,32 @@ export async function deleteTag(input: DeleteTagInput) {
   try {
     await requireAdmin();
 
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
 
-    const { error } = await supabase.from("tags").delete().eq("id", input.id);
+    const docRef = db.collection("tags").doc(input.id);
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      return { error: "タグが見つかりません" };
+    }
 
-    if (error) {
-      // レコードが見つからない
-      if (error.code === "PGRST116") {
-        return { error: "タグが見つかりません" };
+    // タグを削除
+    await docRef.delete();
+
+    // 議案の tag_ids 配列からも該当タグを除去
+    const billsWithTag = await db
+      .collection("bills")
+      .where("tag_ids", "array-contains", input.id)
+      .get();
+
+    if (!billsWithTag.empty) {
+      const batch = db.batch();
+      for (const billDoc of billsWithTag.docs) {
+        const currentTagIds: string[] = billDoc.data().tag_ids || [];
+        batch.update(billDoc.ref, {
+          tag_ids: currentTagIds.filter((id) => id !== input.id),
+        });
       }
-      return { error: `タグの削除に失敗しました: ${error.message}` };
+      await batch.commit();
     }
 
     // web側のキャッシュを無効化

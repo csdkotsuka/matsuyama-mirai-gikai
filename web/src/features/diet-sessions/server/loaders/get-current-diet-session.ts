@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { DietSession } from "../../shared/types";
@@ -10,7 +10,6 @@ import type { DietSession } from "../../shared/types";
 export async function getCurrentDietSession(
   date: Date
 ): Promise<DietSession | null> {
-  // YYYY-MM-DD形式に変換
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -21,27 +20,41 @@ export async function getCurrentDietSession(
 
 const _getCachedCurrentDietSession = unstable_cache(
   async (targetDate: string): Promise<DietSession | null> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
+      const snapshot = await db.collection("diet_sessions").get();
 
-    const { data, error } = await supabase
-      .from("diet_sessions")
-      .select("*")
-      .lte("start_date", targetDate)
-      .gte("end_date", targetDate)
-      .order("start_date", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      const matching = snapshot.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((session: any) => {
+          return (
+            session.start_date <= targetDate && session.end_date >= targetDate
+          );
+        }) as DietSession[];
 
-    if (error) {
+      if (matching.length === 0) {
+        // 開催中がなければ、最新の会期を返すフォールバック
+        const allSessions = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as DietSession[];
+        allSessions.sort((a, b) => b.start_date.localeCompare(a.start_date));
+        return allSessions[0] || null;
+      }
+
+      matching.sort((a, b) => b.start_date.localeCompare(a.start_date));
+      return matching[0];
+    } catch (error) {
       console.error("Failed to fetch current diet session:", error);
       return null;
     }
-
-    return data;
   },
   ["current-diet-session"],
   {
-    revalidate: 3600, // 1時間（3600秒）
+    revalidate: 3600,
     tags: [CACHE_TAGS.DIET_SESSIONS],
   }
 );

@@ -29,11 +29,15 @@ const BASE_STEPS = [
 // ステップ番号マッピング
 const STATUS_TO_STEP: Record<BillStatusEnum, number> = {
   preparing: 0,
+  coming_soon: 0,
   introduced: 1,
   in_originating_house: 2,
   in_receiving_house: 3,
+  in_other_house: 3,
   enacted: 4,
   rejected: 4,
+  withdrawn: 4,
+  continued: 2,
 } as const;
 
 // プログレス比率の計算

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { getChatSupabaseUser } from "@/features/chat/server/utils/supabase-server";
 
 export type AuthenticatedUserResult =
@@ -19,10 +19,9 @@ export type AuthenticatedUserResult =
 export async function getAuthenticatedUser(): Promise<AuthenticatedUserResult> {
   const {
     data: { user },
-    error: getUserError,
   } = await getChatSupabaseUser();
 
-  if (getUserError || !user) {
+  if (!user || !user.id) {
     return { authenticated: false, error: "認証が必要です" };
   }
 
@@ -41,8 +40,6 @@ export type VerifySessionOwnershipResult =
 
 /**
  * セッションの所有者確認を行う共通ユーティリティ
- * - ユーザー認証を確認
- * - セッションの所有者と現在のユーザーが一致するか確認
  */
 export async function verifySessionOwnership(
   sessionId: string
@@ -54,19 +51,18 @@ export async function verifySessionOwnership(
   }
 
   const { userId } = authResult;
-  const supabase = createAdminClient();
+  const db = getAdminFirestore();
 
-  const { data: session, error: sessionError } = await supabase
-    .from("interview_sessions")
-    .select("user_id")
-    .eq("id", sessionId)
-    .single();
+  const doc = await db.collection("interview_sessions").doc(sessionId).get();
 
-  if (sessionError || !session) {
+  if (!doc.exists) {
     return { authorized: false, error: "セッションが見つかりません" };
   }
 
-  if (session.user_id !== userId) {
+  const session = doc.data()!;
+  const sessionUserId = session.user_id || session.user_identifier;
+
+  if (sessionUserId && sessionUserId !== userId) {
     return {
       authorized: false,
       error: "このセッションへのアクセス権限がありません",
@@ -76,9 +72,6 @@ export async function verifySessionOwnership(
   return { authorized: true, userId };
 }
 
-/**
- * セッションの所有者かどうかをチェックする（既に取得したuser_idと比較）
- */
 export function isSessionOwner(
   sessionUserId: string,
   currentUserId: string

@@ -25,7 +25,9 @@ export function createPromptProvider(): PromptProvider {
   const client = getLangfuseClient();
 
   if (!client) {
-    console.log("[Prompt] Using fallback prompt provider (Langfuse not configured)");
+    console.log(
+      "[Prompt] Using fallback prompt provider (Langfuse not configured)"
+    );
     return new FallbackPromptProvider();
   }
 

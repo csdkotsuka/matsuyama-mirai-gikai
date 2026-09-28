@@ -1,18 +1,26 @@
-import type { User } from "../supabase/auth";
+export interface AdminUser {
+  uid: string;
+  email?: string;
+  admin?: boolean;
+  roles?: string[];
+}
+
 /**
  * ユーザーがadmin権限を持っているかチェック
  */
-export function checkAdminPermission(user: User | null): boolean {
+export function checkAdminPermission(user: AdminUser | null): boolean {
   if (!user) return false;
-  const roles = user.app_metadata?.roles || [];
+  if (user.admin === true) return true;
+  const roles = user.roles || [];
   return roles.includes("admin");
 }
 
 /**
  * ユーザーがeditor権限を持っているかチェック (将来的に使用)
  */
-export function checkEditorPermission(user: User | null): boolean {
+export function checkEditorPermission(user: AdminUser | null): boolean {
   if (!user) return false;
-  const roles = user.app_metadata?.roles || [];
+  if (user.admin === true) return true;
+  const roles = user.roles || [];
   return roles.includes("admin") || roles.includes("editor");
 }

@@ -1,78 +1,65 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { getDifficultyLevel } from "@/features/bill-difficulty/server/loaders/get-difficulty-level";
 import type { DifficultyLevelEnum } from "@/features/bill-difficulty/shared/types";
 import { CACHE_TAGS } from "@/lib/cache-tags";
-import type { ComingSoonBill } from "../../shared/types";
+import type { ComingSoonBill, BillContent } from "../../shared/types";
 
-/**
- * Coming Soon議案を取得する
- * publish_status = 'coming_soon' の議案を取得
- */
 export async function getComingSoonBills(): Promise<ComingSoonBill[]> {
-  // キャッシュ外でcookiesにアクセス
   const difficultyLevel = await getDifficultyLevel();
   return _getCachedComingSoonBills(difficultyLevel);
 }
 
 const _getCachedComingSoonBills = unstable_cache(
   async (difficultyLevel: DifficultyLevelEnum): Promise<ComingSoonBill[]> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
 
-    // bill_contentsからタイトルも取得（指定された難易度レベルを使用）
-    const { data, error } = await supabase
-      .from("bills")
-      .select(
-        `
-        id,
-        name,
-        originating_house,
-        shugiin_url,
-        bill_contents (
-          title,
-          difficulty_level
-        )
-      `
-      )
-      .eq("publish_status", "coming_soon")
-      .order("created_at", { ascending: false });
+      const [billsSnap, contentsSnap] = await Promise.all([
+        db
+          .collection("bills")
+          .where("publish_status", "==", "coming_soon")
+          .get(),
+        db.collection("bill_contents").get(),
+      ]);
 
-    if (error) {
+      const contentsByBillId = new Map<string, BillContent[]>();
+      contentsSnap.docs.forEach((doc) => {
+        const data = doc.data() as BillContent;
+        if (!contentsByBillId.has(data.bill_id)) {
+          contentsByBillId.set(data.bill_id, []);
+        }
+        contentsByBillId.get(data.bill_id)!.push({ ...data, id: doc.id });
+      });
+
+      const bills: ComingSoonBill[] = billsSnap.docs.map((doc) => {
+        const bill = doc.data();
+        const contents = contentsByBillId.get(doc.id) || [];
+
+        const preferredContent = contents.find(
+          (c) => c.difficulty_level === difficultyLevel
+        );
+        const fallbackContent =
+          contents.find((c) => c.difficulty_level === "normal") || contents[0];
+
+        return {
+          id: doc.id,
+          name: bill.name,
+          title: preferredContent?.title || fallbackContent?.title || null,
+          originating_house: bill.originating_house,
+          shugiin_url: bill.shugiin_url ?? null,
+        };
+      });
+
+      return bills;
+    } catch (error) {
       console.error("Failed to fetch coming soon bills:", error);
       return [];
     }
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    // bill_contentsからtitleを抽出（ユーザーの難易度設定を使用）
-    return data.map((bill) => {
-      const contents = bill.bill_contents as Array<{
-        title: string;
-        difficulty_level: string;
-      }> | null;
-
-      // ユーザーが選択した難易度のコンテンツを優先
-      const preferredContent = contents?.find(
-        (c) => c.difficulty_level === difficultyLevel
-      );
-      // フォールバック: normalを優先、それもなければ任意のコンテンツ
-      const fallbackContent =
-        contents?.find((c) => c.difficulty_level === "normal") || contents?.[0];
-
-      return {
-        id: bill.id,
-        name: bill.name,
-        title: preferredContent?.title || fallbackContent?.title || null,
-        originating_house: bill.originating_house,
-        shugiin_url: bill.shugiin_url,
-      };
-    });
   },
   ["coming-soon-bills-list"],
   {
-    revalidate: 600, // 10分（600秒）
+    revalidate: 600,
     tags: [CACHE_TAGS.BILLS],
   }
 );

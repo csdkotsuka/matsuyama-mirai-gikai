@@ -1,4 +1,10 @@
-import { createBrowserClient } from "@mirai-gikai/supabase";
+import { getFirebaseClient } from "@mirai-gikai/firebase/client";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
 
 export interface UploadResult {
   url?: string;
@@ -11,14 +17,14 @@ export interface DeleteResult {
 }
 
 /**
- * サムネイル画像をSupabase Storageにアップロード
+ * サムネイル画像をFirebase Storageにアップロード
  */
 export async function uploadThumbnail(
   file: File,
   billId?: string,
   storagePrefix?: string
 ): Promise<UploadResult> {
-  const supabase = createBrowserClient();
+  const { storage } = getFirebaseClient();
 
   // ファイル形式チェック
   if (!file.type.startsWith("image/")) {
@@ -34,27 +40,16 @@ export async function uploadThumbnail(
     // 新しいファイル名を生成
     const fileExt = file.name.split(".").pop();
     const prefix = storagePrefix ? `${storagePrefix}_` : "";
-    const fileName = `${prefix}${billId || "new"}_${Date.now()}.${fileExt}`;
+    const fileName = `thumbnails/${prefix}${billId || "new"}_${Date.now()}.${fileExt}`;
 
-    // ファイルをアップロード
-    const { data, error } = await supabase.storage
-      .from("bill-thumbnails")
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
+    const storageRef = ref(storage, fileName);
+    const snapshot = await uploadBytes(storageRef, file, {
+      contentType: file.type,
+    });
 
-    if (error) {
-      console.error("Upload error:", error);
-      return { error: "アップロードに失敗しました" };
-    }
+    const downloadUrl = await getDownloadURL(snapshot.ref);
 
-    // 公開URLを取得
-    const { data: urlData } = supabase.storage
-      .from("bill-thumbnails")
-      .getPublicUrl(data.path);
-
-    return { url: urlData.publicUrl };
+    return { url: downloadUrl };
   } catch (error) {
     console.error("Upload error:", error);
     return { error: "アップロードに失敗しました" };
@@ -62,26 +57,14 @@ export async function uploadThumbnail(
 }
 
 /**
- * サムネイル画像をSupabase Storageから削除
+ * サムネイル画像をFirebase Storageから削除
  */
 export async function deleteThumbnail(url: string): Promise<DeleteResult> {
-  const supabase = createBrowserClient();
+  const { storage } = getFirebaseClient();
 
   try {
-    const fileName = url.split("/").pop();
-    if (!fileName) {
-      return { success: false, error: "ファイル名が取得できません" };
-    }
-
-    const { error } = await supabase.storage
-      .from("bill-thumbnails")
-      .remove([fileName]);
-
-    if (error) {
-      console.error("Delete error:", error);
-      return { success: false, error: "削除に失敗しました" };
-    }
-
+    const storageRef = ref(storage, url);
+    await deleteObject(storageRef);
     return { success: true };
   } catch (error) {
     console.error("Delete error:", error);

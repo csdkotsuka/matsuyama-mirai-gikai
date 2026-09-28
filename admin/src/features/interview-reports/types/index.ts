@@ -1,13 +1,10 @@
-import type { Database } from "@mirai-gikai/supabase";
+import type {
+  InterviewSession,
+  InterviewReport,
+  InterviewMessage,
+} from "@mirai-gikai/firebase";
 
-export type InterviewSession =
-  Database["public"]["Tables"]["interview_sessions"]["Row"];
-
-export type InterviewReport =
-  Database["public"]["Tables"]["interview_report"]["Row"];
-
-export type InterviewMessage =
-  Database["public"]["Tables"]["interview_messages"]["Row"];
+export type { InterviewSession, InterviewReport, InterviewMessage };
 
 export type InterviewSessionWithDetails = InterviewSession & {
   message_count: number;
@@ -27,7 +24,7 @@ export function getSessionStatus(session: InterviewSession): SessionStatus {
 
 export function formatDuration(
   startedAt: string,
-  completedAt: string | null
+  completedAt: string | null | undefined
 ): string {
   if (!completedAt) return "-";
 

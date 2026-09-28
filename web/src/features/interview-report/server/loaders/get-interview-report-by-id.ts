@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import {
   getAuthenticatedUser,
   isSessionOwner,
@@ -16,7 +16,6 @@ export type InterviewReportWithSessionInfo = InterviewReport & {
 
 /**
  * レポートIDからインタビューレポートと関連情報を取得
- * 認可チェック: セッションの所有者のみがレポートを取得できる
  */
 export async function getInterviewReportById(
   reportId: string
@@ -29,55 +28,46 @@ export async function getInterviewReportById(
   }
 
   const { userId } = authResult;
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
 
-  // レポートとセッション、interview_configを結合して取得
-  const { data: report, error: reportError } = await supabase
-    .from("interview_report")
-    .select(
-      "*, interview_sessions(user_id, started_at, completed_at, is_public_by_user, interview_configs(bill_id))"
-    )
-    .eq("id", reportId)
-    .single();
+    const reportDoc = await db
+      .collection("interview_reports")
+      .doc(reportId)
+      .get();
+    if (!reportDoc.exists) {
+      return null;
+    }
 
-  if (reportError || !report) {
-    console.error("Failed to fetch interview report:", reportError);
+    const reportData = reportDoc.data()!;
+    const sessionId = reportData.session_id || reportData.interview_session_id;
+
+    const sessionDoc = await db
+      .collection("interview_sessions")
+      .doc(sessionId)
+      .get();
+    if (!sessionDoc.exists) {
+      return null;
+    }
+
+    const session = sessionDoc.data()!;
+    const sessionUserId = session.user_id || session.user_identifier;
+
+    if (sessionUserId && !isSessionOwner(sessionUserId, userId)) {
+      console.error("Unauthorized access to interview report");
+      return null;
+    }
+
+    return {
+      id: reportDoc.id,
+      ...reportData,
+      bill_id: session.bill_id,
+      session_started_at: session.started_at || session.created_at || "",
+      session_completed_at: session.completed_at ?? null,
+      is_public_by_user: session.is_public_by_user ?? false,
+    } as InterviewReportWithSessionInfo;
+  } catch (error) {
+    console.error("Failed to fetch interview report by id:", error);
     return null;
   }
-
-  // セッション情報を取得
-  const session = report.interview_sessions as {
-    user_id: string;
-    started_at: string;
-    completed_at: string | null;
-    is_public_by_user: boolean;
-    interview_configs: { bill_id: string } | null;
-  } | null;
-
-  if (!session) {
-    console.error("Session not found for report");
-    return null;
-  }
-
-  // 認可チェック: セッションの所有者と現在のユーザーが一致するか
-  if (!isSessionOwner(session.user_id, userId)) {
-    console.error("Unauthorized access to interview report");
-    return null;
-  }
-
-  // interview_configsからbill_idを取得
-  if (!session.interview_configs) {
-    console.error("Interview config not found for session");
-    return null;
-  }
-
-  // レポートデータを返す
-  const { interview_sessions: _, ...reportData } = report;
-  return {
-    ...reportData,
-    bill_id: session.interview_configs.bill_id,
-    session_started_at: session.started_at,
-    session_completed_at: session.completed_at,
-    is_public_by_user: session.is_public_by_user,
-  };
 }

@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
@@ -36,20 +36,18 @@ async function _updateBillPublishStatus(
   publishStatus: BillPublishStatus
 ): Promise<UpdatePublishStatusResult> {
   try {
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
 
-    const { error } = await supabase
-      .from("bills")
-      .update({ publish_status: publishStatus })
-      .eq("id", billId);
+    const updateData: any = {
+      publish_status: publishStatus,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (error) {
-      console.error("Failed to update publish status:", error);
-      return {
-        success: false,
-        error: "ステータスの更新に失敗しました",
-      };
+    if (publishStatus === "published") {
+      updateData.published_at = new Date().toISOString();
     }
+
+    await db.collection("bills").doc(billId).update(updateData);
 
     // web側のキャッシュを無効化
     await invalidateWebCache();

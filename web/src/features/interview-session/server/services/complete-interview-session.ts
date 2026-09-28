@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import {
   type InterviewReportData,
   interviewChatWithReportSchema,
@@ -34,20 +34,22 @@ function extractReportFromMessage(content: string): InterviewReportData | null {
 export async function completeInterviewSession({
   sessionId,
 }: CompleteInterviewSessionParams): Promise<InterviewReport> {
-  const supabase = createAdminClient();
+  const db = getAdminFirestore();
 
-  // メッセージ履歴を取得（新しい順）
-  const { data: messages, error: messagesError } = await supabase
-    .from("interview_messages")
-    .select("*")
-    .eq("interview_session_id", sessionId)
-    .order("created_at", { ascending: false });
+  // メッセージ履歴を取得
+  const messagesSnapshot = await db
+    .collection("interview_messages")
+    .where("interview_session_id", "==", sessionId)
+    .get();
 
-  if (messagesError || !messages) {
-    throw new Error(
-      `Failed to fetch interview messages: ${messagesError?.message ?? "unknown"}`
-    );
-  }
+  const messages = messagesSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as any[];
+
+  messages.sort((a, b) =>
+    (b.created_at || "").localeCompare(a.created_at || "")
+  );
 
   // 最新のアシスタントメッセージからレポートを抽出
   let reportData: InterviewReportData | null = null;
@@ -65,39 +67,62 @@ export async function completeInterviewSession({
   }
 
   // レポートを保存（UPSERT）
-  const { data: report, error: upsertError } = await supabase
-    .from("interview_report")
-    .upsert(
-      {
-        interview_session_id: sessionId,
-        summary: reportData.summary,
-        stance: reportData.stance,
-        role: reportData.role,
-        role_description: reportData.role_description,
-        opinions: reportData.opinions,
-      },
-      { onConflict: "interview_session_id" }
-    )
-    .select()
-    .single();
+  const existingReportSnap = await db
+    .collection("interview_reports")
+    .where("interview_session_id", "==", sessionId)
+    .limit(1)
+    .get();
 
-  if (upsertError || !report) {
-    throw new Error(
-      `Failed to save interview report: ${upsertError?.message ?? "unknown"}`
-    );
+  const now = new Date().toISOString();
+  let reportId: string;
+  let report: InterviewReport;
+
+  if (!existingReportSnap.empty) {
+    const docRef = existingReportSnap.docs[0].ref;
+    reportId = existingReportSnap.docs[0].id;
+    const existingData = existingReportSnap.docs[0].data();
+
+    const updateData = {
+      summary: reportData.summary,
+      stance: reportData.stance,
+      role: reportData.role,
+      role_description: reportData.role_description ?? null,
+      opinions: reportData.opinions,
+      updated_at: now,
+    };
+    await docRef.update(updateData);
+
+    report = {
+      id: reportId,
+      interview_session_id: sessionId,
+      is_public: existingData.is_public ?? false,
+      created_at: existingData.created_at ?? now,
+      ...updateData,
+    } as InterviewReport;
+  } else {
+    const docRef = db.collection("interview_reports").doc();
+    reportId = docRef.id;
+
+    report = {
+      id: reportId,
+      interview_session_id: sessionId,
+      summary: reportData.summary,
+      stance: reportData.stance,
+      role: reportData.role,
+      role_description: reportData.role_description ?? undefined,
+      opinions: reportData.opinions,
+      is_public: false,
+      created_at: now,
+      updated_at: now,
+    };
+    await docRef.set(report);
   }
 
   // セッションを完了
-  const { error: sessionUpdateError } = await supabase
-    .from("interview_sessions")
-    .update({ completed_at: new Date().toISOString() })
-    .eq("id", sessionId);
-
-  if (sessionUpdateError) {
-    throw new Error(
-      `Failed to complete interview session: ${sessionUpdateError?.message ?? "unknown"}`
-    );
-  }
+  await db
+    .collection("interview_sessions")
+    .doc(sessionId)
+    .update({ completed_at: now });
 
   return report;
 }

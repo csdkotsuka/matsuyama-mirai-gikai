@@ -1,44 +1,56 @@
 import "client-only";
-import { createBrowserClient } from "@mirai-gikai/supabase";
-import { checkAdminPermission } from "@/lib/auth/permissions";
-
-const supabase = createBrowserClient();
-export const authClient = supabase.auth;
+import { getFirebaseClient } from "@mirai-gikai/firebase/client";
+import {
+  type UserCredential,
+  signInWithEmailAndPassword,
+  signOut as fbSignOut,
+} from "firebase/auth";
 
 export async function signIn(email: string, password: string) {
-  const { data, error } = await authClient.signInWithPassword({
-    email,
-    password,
-  });
+  const { auth } = getFirebaseClient();
 
-  if (error) {
+  let userCredential: UserCredential;
+  try {
+    userCredential = await signInWithEmailAndPassword(auth, email, password);
+  } catch (error: any) {
+    console.error("Firebase sign in error:", error);
     throw new Error(
       "ログインに失敗しました。メールアドレスとパスワードを確認してください。"
     );
   }
 
-  if (!checkAdminPermission(data.user)) {
-    await authClient.signOut();
-    throw new Error("管理者権限がありません。アクセスが拒否されました。");
+  const idToken = await userCredential.user.getIdToken();
+
+  // Exchange ID token for session cookie via API
+  const response = await fetch("/api/auth/session", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    await fbSignOut(auth);
+    throw new Error(
+      errorData.error || "管理者権限がありません。アクセスが拒否されました。"
+    );
   }
 
-  return data;
+  return userCredential.user;
 }
 
 export async function signOut() {
-  const { error } = await authClient.signOut();
-  if (error) {
+  const { auth } = getFirebaseClient();
+  try {
+    await fbSignOut(auth);
+    await fetch("/api/auth/session", { method: "DELETE" });
+  } catch (error) {
+    console.error("Logout error:", error);
     throw new Error("ログアウトに失敗しました。");
   }
 }
 
 export async function getCurrentUser() {
-  const {
-    data: { user },
-    error,
-  } = await authClient.getUser();
-  if (error) {
-    throw new Error(`ユーザー情報の取得に失敗しました。${error}`);
-  }
-  return user;
+  const { auth } = getFirebaseClient();
+  return auth.currentUser;
 }

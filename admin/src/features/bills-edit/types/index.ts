@@ -1,10 +1,9 @@
-import type { Database } from "@mirai-gikai/supabase";
+import type { Bill } from "@mirai-gikai/firebase";
 import { z } from "zod";
 
-// 既存の型を再利用
-export type Bill = Database["public"]["Tables"]["bills"]["Row"];
-export type BillUpdate = Database["public"]["Tables"]["bills"]["Update"];
-export type BillInsert = Database["public"]["Tables"]["bills"]["Insert"];
+export type { Bill };
+export type BillUpdate = Partial<Bill>;
+export type BillInsert = Omit<Bill, "id" | "created_at" | "updated_at">;
 
 // 公開ステータス型
 export type BillPublishStatus = "draft" | "published" | "coming_soon";
@@ -17,11 +16,15 @@ const billBaseSchema = z.object({
     .max(200, "議案名は200文字以内で入力してください"),
   status: z.enum([
     "preparing",
+    "coming_soon",
     "introduced",
     "in_originating_house",
     "in_receiving_house",
+    "in_other_house",
     "enacted",
     "rejected",
+    "withdrawn",
+    "continued",
   ]),
   originating_house: z.enum(["HR", "HC"]),
   status_note: z
@@ -40,10 +43,10 @@ const billBaseSchema = z.object({
     })
     .optional(),
   is_featured: z.boolean(),
-  diet_session_id: z.string().uuid().nullable().optional(),
+  diet_session_id: z.string().nullable().optional(),
 });
 
-// 更新用スキーマ（既存）
+// 更新用スキーマ
 export const billUpdateSchema = billBaseSchema;
 export type BillUpdateInput = z.infer<typeof billUpdateSchema>;
 

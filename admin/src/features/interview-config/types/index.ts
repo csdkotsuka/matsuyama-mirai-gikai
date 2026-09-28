@@ -1,20 +1,37 @@
-import type { Database } from "@mirai-gikai/supabase";
 import { z } from "zod";
 
-// Database types
-export type InterviewConfig =
-  Database["public"]["Tables"]["interview_configs"]["Row"];
-export type InterviewConfigInsert =
-  Database["public"]["Tables"]["interview_configs"]["Insert"];
-export type InterviewConfigUpdate =
-  Database["public"]["Tables"]["interview_configs"]["Update"];
+export interface InterviewConfig {
+  id: string;
+  bill_id: string;
+  status: "public" | "closed";
+  themes: string[];
+  knowledge_source?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
-export type InterviewQuestion =
-  Database["public"]["Tables"]["interview_questions"]["Row"];
-export type InterviewQuestionInsert =
-  Database["public"]["Tables"]["interview_questions"]["Insert"];
-export type InterviewQuestionUpdate =
-  Database["public"]["Tables"]["interview_questions"]["Update"];
+export type InterviewConfigInsert = Omit<
+  InterviewConfig,
+  "id" | "created_at" | "updated_at"
+>;
+export type InterviewConfigUpdate = Partial<InterviewConfigInsert>;
+
+export interface InterviewQuestion {
+  id: string;
+  interview_config_id: string;
+  question: string;
+  instruction?: string | null;
+  quick_replies?: string[] | null;
+  question_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type InterviewQuestionInsert = Omit<
+  InterviewQuestion,
+  "id" | "created_at" | "updated_at"
+>;
+export type InterviewQuestionUpdate = Partial<InterviewQuestionInsert>;
 
 // バリデーションスキーマ
 export const interviewConfigSchema = z.object({

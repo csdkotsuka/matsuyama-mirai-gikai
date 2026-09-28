@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { verifySessionOwnership } from "../utils/verify-session-ownership";
 
 interface ArchiveInterviewSessionResult {
@@ -10,7 +10,6 @@ interface ArchiveInterviewSessionResult {
 
 /**
  * インタビューセッションをアーカイブする
- * アーカイブされたセッションは「やり直し」として扱われ、新しいセッションを開始できる
  */
 export async function archiveInterviewSession(
   sessionId: string
@@ -21,18 +20,16 @@ export async function archiveInterviewSession(
     return { success: false, error: ownershipResult.error };
   }
 
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    await db.collection("interview_sessions").doc(sessionId).update({
+      archived_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
-  // アーカイブ実行
-  const { error: updateError } = await supabase
-    .from("interview_sessions")
-    .update({ archived_at: new Date().toISOString() })
-    .eq("id", sessionId);
-
-  if (updateError) {
+    return { success: true };
+  } catch (updateError) {
     console.error("Failed to archive interview session:", updateError);
     return { success: false, error: "アーカイブに失敗しました" };
   }
-
-  return { success: true };
 }

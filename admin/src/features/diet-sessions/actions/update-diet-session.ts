@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
 import type { UpdateDietSessionInput } from "../types";
@@ -9,9 +9,6 @@ export async function updateDietSession(input: UpdateDietSessionInput) {
   try {
     await requireAdmin();
 
-    const supabase = createAdminClient();
-
-    // バリデーション
     if (!input.name || input.name.trim().length === 0) {
       return { error: "国会名を入力してください" };
     }
@@ -24,14 +21,12 @@ export async function updateDietSession(input: UpdateDietSessionInput) {
       return { error: "終了日を入力してください" };
     }
 
-    // slug のバリデーション（半角英数字とハイフンのみ）
     if (input.slug && !/^[a-z0-9-]+$/.test(input.slug)) {
       return {
         error: "スラッグは半角英小文字、数字、ハイフンのみ使用できます",
       };
     }
 
-    // 日付の妥当性チェック
     const startDate = new Date(input.start_date);
     const endDate = new Date(input.end_date);
 
@@ -39,25 +34,26 @@ export async function updateDietSession(input: UpdateDietSessionInput) {
       return { error: "終了日は開始日以降の日付を指定してください" };
     }
 
-    const { data, error } = await supabase
-      .from("diet_sessions")
-      .update({
-        name: input.name.trim(),
-        slug: input.slug?.trim() || null,
-        shugiin_url: input.shugiin_url?.trim() || null,
-        start_date: input.start_date,
-        end_date: input.end_date,
-      })
-      .eq("id", input.id)
-      .select()
-      .single();
-
-    if (error) {
-      return { error: `国会会期の更新に失敗しました: ${error.message}` };
+    const db = getAdminFirestore();
+    const docRef = db.collection("diet_sessions").doc(input.id);
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      return { error: "国会会期が見つかりません" };
     }
 
+    const updateData = {
+      name: input.name.trim(),
+      slug: input.slug?.trim() || null,
+      shugiin_url: input.shugiin_url?.trim() || null,
+      start_date: input.start_date,
+      end_date: input.end_date,
+      updated_at: new Date().toISOString(),
+    };
+
+    await docRef.update(updateData);
+
     await invalidateWebCache();
-    return { data };
+    return { data: { id: input.id, ...docSnap.data(), ...updateData } };
   } catch (error) {
     console.error("Update diet session error:", error);
     if (error instanceof Error) {

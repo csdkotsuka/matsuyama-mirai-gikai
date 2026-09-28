@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 import type { DietSession } from "../../shared/types";
@@ -14,20 +14,27 @@ export async function getDietSessionBySlug(
 
 const _getCachedDietSessionBySlug = unstable_cache(
   async (slug: string): Promise<DietSession | null> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
+      const snapshot = await db
+        .collection("diet_sessions")
+        .where("slug", "==", slug)
+        .limit(1)
+        .get();
 
-    const { data, error } = await supabase
-      .from("diet_sessions")
-      .select("*")
-      .eq("slug", slug)
-      .maybeSingle();
+      if (snapshot.empty) {
+        return null;
+      }
 
-    if (error) {
+      const doc = snapshot.docs[0];
+      return {
+        id: doc.id,
+        ...doc.data(),
+      } as DietSession;
+    } catch (error) {
       console.error("Failed to fetch diet session by slug:", error);
       return null;
     }
-
-    return data;
   },
   ["diet-session-by-slug"],
   {

@@ -1,19 +1,21 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 
 /**
  * 議案に紐づくタグIDの配列を取得する
  */
 export async function getBillTagIds(billId: string): Promise<string[]> {
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    const docSnap = await db.collection("bills").doc(billId).get();
 
-  const { data, error } = await supabase
-    .from("bills_tags")
-    .select("tag_id")
-    .eq("bill_id", billId);
+    if (!docSnap.exists) {
+      return [];
+    }
 
-  if (error) {
+    const data = docSnap.data();
+    return Array.isArray(data?.tag_ids) ? data.tag_ids : [];
+  } catch (error: any) {
+    console.error("Failed to get bill tags:", error);
     throw new Error(`議案のタグ取得に失敗しました: ${error.message}`);
   }
-
-  return data?.map((item) => item.tag_id) || [];
 }

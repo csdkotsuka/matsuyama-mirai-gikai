@@ -28,6 +28,8 @@ lerna-debug.log*
 .env.production.local
 .env.*
 !.env.example
+service-account.json
+*-adminsdk-*.json
 
 # Vercel
 .vercel

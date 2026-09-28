@@ -45,7 +45,10 @@ export function MiraiStanceCard({ stance, billStatus }: MiraiStanceCardProps) {
         return {
           bg: "bg-[#E5E5EA]",
           textColor: "text-black",
-          label: stance != null ? STANCE_LABELS[stance.type] : "中立",
+          label:
+            stance != null
+              ? (STANCE_LABELS as Record<string, string>)[stance.type] || "中立"
+              : "中立",
         };
     }
   };

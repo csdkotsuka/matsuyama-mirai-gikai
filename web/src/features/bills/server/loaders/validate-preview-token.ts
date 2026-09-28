@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 
 export async function validatePreviewToken(
   billId: string,
@@ -9,24 +9,22 @@ export async function validatePreviewToken(
   }
 
   try {
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
+    const snapshot = await db
+      .collection("preview_tokens")
+      .where("bill_id", "==", billId)
+      .where("token", "==", token)
+      .limit(1)
+      .get();
 
-    const { data, error } = await supabase
-      .from("preview_tokens")
-      .select("expires_at")
-      .eq("bill_id", billId)
-      .eq("token", token)
-      .single();
-
-    if (error || !data) {
+    if (snapshot.empty) {
       return false;
     }
 
-    // 有効期限をチェック
+    const doc = snapshot.docs[0];
+    const data = doc.data();
     const expiresAt = new Date(data.expires_at);
-    const now = new Date();
-
-    return expiresAt > now;
+    return expiresAt > new Date();
   } catch (error) {
     console.error("Error validating preview token:", error);
     return false;

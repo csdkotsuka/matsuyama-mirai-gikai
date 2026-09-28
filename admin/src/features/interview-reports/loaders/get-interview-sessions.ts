@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import type { InterviewSessionWithDetails } from "../types";
 
 export const SESSIONS_PER_PAGE = 30;
@@ -7,108 +7,86 @@ export async function getInterviewSessions(
   billId: string,
   page = 1
 ): Promise<InterviewSessionWithDetails[]> {
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
 
-  // まずinterview_configを取得
-  const { data: config, error: configError } = await supabase
-    .from("interview_configs")
-    .select("id")
-    .eq("bill_id", billId)
-    .single();
+    const sessionsSnap = await db
+      .collection("interview_sessions")
+      .where("bill_id", "==", billId)
+      .orderBy("created_at", "desc")
+      .limit(SESSIONS_PER_PAGE * page)
+      .get();
 
-  if (configError || !config) {
-    return [];
-  }
-
-  // ページネーション計算
-  const from = (page - 1) * SESSIONS_PER_PAGE;
-  const to = from + SESSIONS_PER_PAGE - 1;
-
-  // セッション一覧を取得
-  const { data: sessions, error: sessionsError } = await supabase
-    .from("interview_sessions")
-    .select(
-      `
-      *,
-      interview_report(*)
-    `
-    )
-    .eq("interview_config_id", config.id)
-    .order("started_at", { ascending: false })
-    .range(from, to);
-
-  if (sessionsError || !sessions) {
-    console.error("Failed to fetch interview sessions:", sessionsError);
-    return [];
-  }
-
-  // 全セッションのメッセージ数を一括取得（RPCで1クエリ集計）
-  const sessionIds = sessions.map((s) => s.id);
-  const { data: messageCounts, error: countError } = await supabase.rpc(
-    "get_interview_message_counts",
-    { session_ids: sessionIds }
-  );
-
-  if (countError) {
-    console.error("Failed to fetch message counts:", {
-      countError,
-      sessionIds,
-    });
-  }
-
-  // セッションIDごとのメッセージ数をマップに変換（missing sessions default to 0）
-  const countMap = new Map<string, number>();
-  for (const id of sessionIds) {
-    countMap.set(id, 0);
-  }
-  for (const row of messageCounts || []) {
-    countMap.set(row.interview_session_id, Number(row.message_count));
-  }
-
-  // セッションにメッセージ数を付与
-  const sessionsWithDetails: InterviewSessionWithDetails[] = sessions.map(
-    (session) => {
-      // interview_reportは配列で返ってくるので最初の要素を取得
-      const report = Array.isArray(session.interview_report)
-        ? session.interview_report[0] || null
-        : session.interview_report;
-
-      return {
-        ...session,
-        message_count: countMap.get(session.id) || 0,
-        interview_report: report,
-      };
+    if (sessionsSnap.empty) {
+      return [];
     }
-  );
 
-  return sessionsWithDetails;
+    const sessions = sessionsSnap.docs
+      .slice((page - 1) * SESSIONS_PER_PAGE, page * SESSIONS_PER_PAGE)
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as any[];
+
+    // 各セッションの report と message_count を取得
+    const results: InterviewSessionWithDetails[] = await Promise.all(
+      sessions.map(async (session) => {
+        const [reportSnap, messagesSnap] = await Promise.all([
+          db
+            .collection("interview_reports")
+            .where("session_id", "==", session.id)
+            .limit(1)
+            .get(),
+          db
+            .collection("interview_messages")
+            .where("session_id", "==", session.id)
+            .get(),
+        ]);
+
+        const report = !reportSnap.empty
+          ? ({ id: reportSnap.docs[0].id, ...reportSnap.docs[0].data() } as any)
+          : null;
+
+        return {
+          id: session.id,
+          bill_id: session.bill_id,
+          user_identifier: session.user_identifier,
+          started_at:
+            session.started_at ||
+            session.created_at ||
+            new Date().toISOString(),
+          completed_at: session.completed_at ?? null,
+          archived_at: session.archived_at ?? null,
+          is_public_by_user: session.is_public_by_user ?? false,
+          created_at: session.created_at || new Date().toISOString(),
+          updated_at: session.updated_at || new Date().toISOString(),
+          message_count: messagesSnap.size,
+          interview_report: report,
+        };
+      })
+    );
+
+    return results;
+  } catch (error) {
+    console.error("Failed to fetch interview sessions:", error);
+    return [];
+  }
 }
 
 export async function getInterviewSessionsCount(
   billId: string
 ): Promise<number> {
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    const snap = await db
+      .collection("interview_sessions")
+      .where("bill_id", "==", billId)
+      .count()
+      .get();
 
-  // まずinterview_configを取得
-  const { data: config, error: configError } = await supabase
-    .from("interview_configs")
-    .select("id")
-    .eq("bill_id", billId)
-    .single();
-
-  if (configError || !config) {
-    return 0;
-  }
-
-  const { count, error } = await supabase
-    .from("interview_sessions")
-    .select("*", { count: "exact", head: true })
-    .eq("interview_config_id", config.id);
-
-  if (error) {
+    return snap.data().count;
+  } catch (error) {
     console.error("Failed to fetch session count:", error);
     return 0;
   }
-
-  return count || 0;
 }

@@ -1,13 +1,12 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { getChatSupabaseUser } from "@/features/chat/server/utils/supabase-server";
 import type { InterviewSession } from "../../shared/types";
 
 export async function getInterviewSession(
   interviewConfigId: string
 ): Promise<InterviewSession | null> {
-  // 認可処理: バックエンド側でuserIdを取得
   const {
     data: { user },
     error: getUserError,
@@ -18,23 +17,30 @@ export async function getInterviewSession(
     return null;
   }
 
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    const snapshot = await db
+      .collection("interview_sessions")
+      .where("interview_config_id", "==", interviewConfigId)
+      .where("user_id", "==", user.id)
+      .get();
 
-  const { data, error } = await supabase
-    .from("interview_sessions")
-    .select("*")
-    .eq("interview_config_id", interviewConfigId)
-    .eq("user_id", user.id)
-    .is("completed_at", null) // 未完了のセッションのみ
-    .is("archived_at", null) // アーカイブされていないセッションのみ
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const activeSessions = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+      .filter(
+        (s: any) => !s.completed_at && !s.archived_at
+      ) as InterviewSession[];
 
-  if (error) {
+    activeSessions.sort((a, b) =>
+      (b.created_at || "").localeCompare(a.created_at || "")
+    );
+
+    return activeSessions[0] || null;
+  } catch (error) {
     console.error("Failed to fetch interview session:", error);
     return null;
   }
-
-  return data;
 }

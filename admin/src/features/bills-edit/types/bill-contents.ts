@@ -1,10 +1,8 @@
-import type { Database } from "@mirai-gikai/supabase";
+import type { BillContent } from "@mirai-gikai/firebase";
 import { z } from "zod";
 
-// 既存の型を再利用
-export type BillContent = Database["public"]["Tables"]["bill_contents"]["Row"];
-export type BillContentUpdate =
-  Database["public"]["Tables"]["bill_contents"]["Update"];
+export type { BillContent };
+export type BillContentUpdate = Partial<BillContent>;
 
 // 難易度レベルの型
 export type DifficultyLevel = "normal" | "hard";

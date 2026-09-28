@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "seed": "tsx run.ts",
+    "seed": "tsx ../../scripts/seed-firestore.ts",
+    "seed:admin": "tsx ../../scripts/create-admin-user.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mirai-gikai/firebase": "workspace:*",
     "@mirai-gikai/supabase": "workspace:*",
     "@supabase/supabase-js": "^2.45.4"
   },

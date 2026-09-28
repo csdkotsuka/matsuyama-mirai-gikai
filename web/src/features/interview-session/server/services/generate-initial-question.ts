@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { generateText, Output } from "ai";
 import { getBillById } from "@/features/bills/server/loaders/get-bill-by-id";
 import { getInterviewConfig } from "@/features/interview-config/server/loaders/get-interview-config";
@@ -61,23 +61,22 @@ export async function generateInitialQuestion({
     }
 
     // 生成した質問を保存（result.textはすでにJSON文字列）
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from("interview_messages")
-      .insert({
-        interview_session_id: sessionId,
-        role: "assistant",
-        content: generatedText,
-      })
-      .select()
-      .single();
+    const db = getAdminFirestore();
+    const now = new Date().toISOString();
+    const docRef = await db.collection("interview_messages").add({
+      interview_session_id: sessionId,
+      role: "assistant",
+      content: generatedText,
+      created_at: now,
+    });
 
-    if (error) {
-      console.error("Failed to save initial question:", error);
-      return null;
-    }
-
-    return data;
+    return {
+      id: docRef.id,
+      interview_session_id: sessionId,
+      role: "assistant",
+      content: generatedText,
+      created_at: now,
+    };
   } catch (error) {
     console.error("Failed to generate initial question:", error);
     return null;

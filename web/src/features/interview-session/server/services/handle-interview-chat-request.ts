@@ -66,10 +66,10 @@ export async function handleInterviewChatRequest({
   const systemPrompt = isSummaryPhase
     ? buildSummarySystemPrompt({ bill, interviewConfig })
     : buildInterviewSystemPrompt({
-      bill,
-      interviewConfig,
-      questions: await getInterviewQuestions(interviewConfig.id),
-    });
+        bill,
+        interviewConfig,
+        questions: await getInterviewQuestions(interviewConfig.id),
+      });
 
   // ストリーミングレスポンスを生成
   return generateStreamingResponse({

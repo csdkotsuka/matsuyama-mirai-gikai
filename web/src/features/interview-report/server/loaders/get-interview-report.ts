@@ -1,12 +1,11 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { verifySessionOwnership } from "@/features/interview-session/server/utils/verify-session-ownership";
 import type { InterviewReport } from "../../shared/types";
 
 /**
  * セッションIDからインタビューレポートを取得
- * 認可チェック: セッションの所有者のみがレポートを取得できる
  */
 export async function getInterviewReport(
   sessionId: string
@@ -21,19 +20,25 @@ export async function getInterviewReport(
     return null;
   }
 
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    const snapshot = await db
+      .collection("interview_reports")
+      .where("session_id", "==", sessionId)
+      .limit(1)
+      .get();
 
-  // レポートを取得
-  const { data: report, error: reportError } = await supabase
-    .from("interview_report")
-    .select("*")
-    .eq("interview_session_id", sessionId)
-    .single();
+    if (snapshot.empty) {
+      return null;
+    }
 
-  if (reportError) {
+    const doc = snapshot.docs[0];
+    return {
+      id: doc.id,
+      ...doc.data(),
+    } as InterviewReport;
+  } catch (reportError) {
     console.error("Failed to fetch interview report:", reportError);
     return null;
   }
-
-  return report;
 }

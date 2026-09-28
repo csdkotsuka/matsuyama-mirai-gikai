@@ -1,22 +1,28 @@
-import type { Database } from "@mirai-gikai/supabase";
+import type {
+  InterviewSession,
+  InterviewMessage,
+  InterviewReport,
+  InterviewQuestion,
+} from "@mirai-gikai/firebase";
 
-// Database types
-export type InterviewSession =
-  Database["public"]["Tables"]["interview_sessions"]["Row"];
-export type InterviewSessionInsert =
-  Database["public"]["Tables"]["interview_sessions"]["Insert"];
-export type InterviewSessionUpdate =
-  Database["public"]["Tables"]["interview_sessions"]["Update"];
+export type {
+  InterviewSession,
+  InterviewMessage,
+  InterviewReport,
+  InterviewQuestion,
+};
 
-export type InterviewMessage =
-  Database["public"]["Tables"]["interview_messages"]["Row"];
-export type InterviewMessageInsert =
-  Database["public"]["Tables"]["interview_messages"]["Insert"];
+export type InterviewSessionInsert = Omit<
+  InterviewSession,
+  "id" | "created_at" | "updated_at"
+>;
+export type InterviewSessionUpdate = Partial<InterviewSessionInsert>;
 
-export type InterviewReport =
-  Database["public"]["Tables"]["interview_report"]["Row"];
-export type InterviewReportInsert =
-  Database["public"]["Tables"]["interview_report"]["Insert"];
-
-export type InterviewQuestion =
-  Database["public"]["Tables"]["interview_questions"]["Row"];
+export type InterviewMessageInsert = Omit<
+  InterviewMessage,
+  "id" | "created_at"
+>;
+export type InterviewReportInsert = Omit<
+  InterviewReport,
+  "id" | "created_at" | "updated_at"
+>;

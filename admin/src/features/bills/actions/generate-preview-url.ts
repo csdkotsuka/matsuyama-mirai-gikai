@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { env } from "@/lib/env";
 
@@ -59,27 +59,28 @@ export async function generatePreviewUrl(
 async function _getExistingValidToken(
   billId: string
 ): Promise<ExistingToken | null> {
-  const supabase = createAdminClient();
+  const db = getAdminFirestore();
+  const snapshot = await db
+    .collection("preview_tokens")
+    .where("bill_id", "==", billId)
+    .limit(1)
+    .get();
 
-  const { data, error } = await supabase
-    .from("preview_tokens")
-    .select("token, expires_at")
-    .eq("bill_id", billId)
-    .single();
-
-  if (error || !data) {
+  if (snapshot.empty) {
     return null;
   }
 
+  const doc = snapshot.docs[0];
+  const data = doc.data();
   const expiresAt = new Date(data.expires_at);
   const now = new Date();
 
   if (expiresAt > now) {
-    return data;
+    return { token: data.token, expires_at: data.expires_at };
   }
 
   // 期限切れの場合は削除
-  await supabase.from("preview_tokens").delete().eq("bill_id", billId);
+  await doc.ref.delete();
   return null;
 }
 
@@ -97,18 +98,14 @@ function _calculateExpiry(): Date {
 
 // トークンをデータベースに保存
 async function _saveToken(billId: string, token: string, expiresAt: Date) {
-  const supabase = createAdminClient();
-
-  const { error } = await supabase.from("preview_tokens").insert({
+  const db = getAdminFirestore();
+  await db.collection("preview_tokens").add({
     bill_id: billId,
     token,
     expires_at: expiresAt.toISOString(),
-    created_by: "admin", // TODO: 実際の管理者IDを使用
+    created_at: new Date().toISOString(),
+    created_by: "admin",
   });
-
-  if (error) {
-    throw new Error(`Failed to insert preview token: ${error}`);
-  }
 }
 
 // プレビューURLを構築
@@ -122,24 +119,22 @@ export async function _validatePreviewToken(
   token: string
 ): Promise<boolean> {
   try {
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
+    const snapshot = await db
+      .collection("preview_tokens")
+      .where("bill_id", "==", billId)
+      .where("token", "==", token)
+      .limit(1)
+      .get();
 
-    const { data, error } = await supabase
-      .from("preview_tokens")
-      .select("expires_at")
-      .eq("bill_id", billId)
-      .eq("token", token)
-      .single();
-
-    if (error || !data) {
+    if (snapshot.empty) {
       return false;
     }
 
-    // 有効期限をチェック
+    const doc = snapshot.docs[0];
+    const data = doc.data();
     const expiresAt = new Date(data.expires_at);
-    const now = new Date();
-
-    return expiresAt > now;
+    return expiresAt > new Date();
   } catch (error) {
     console.error("Error validating preview token:", error);
     return false;

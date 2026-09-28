@@ -85,11 +85,12 @@ export function SessionList({
           </TableHeader>
           <TableBody>
             {sessions.map((session, index) => {
+              const startedAt =
+                session.started_at ||
+                session.created_at ||
+                new Date().toISOString();
               const status = getSessionStatus(session);
-              const duration = formatDuration(
-                session.started_at,
-                session.completed_at
-              );
+              const duration = formatDuration(startedAt, session.completed_at);
               const hasReport = !!session.interview_report;
               const rowNumber = totalCount - startIndex - index;
 
@@ -118,7 +119,7 @@ export function SessionList({
                   <TableCell className="text-gray-600">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      {new Date(session.started_at).toLocaleString("ja-JP", {
+                      {new Date(startedAt).toLocaleString("ja-JP", {
                         year: "numeric",
                         month: "2-digit",
                         day: "2-digit",

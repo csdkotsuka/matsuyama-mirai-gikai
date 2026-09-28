@@ -1,25 +1,38 @@
-import type { Database } from "@mirai-gikai/supabase";
+import type {
+  Bill,
+  BillContent,
+  MiraiStance,
+  HouseEnum,
+  BillStatusEnum,
+  BillPublishStatus,
+} from "@mirai-gikai/firebase";
 
-// Database types
-export type Bill = Database["public"]["Tables"]["bills"]["Row"];
-export type BillInsert = Database["public"]["Tables"]["bills"]["Insert"];
-export type BillUpdate = Database["public"]["Tables"]["bills"]["Update"];
+export type {
+  Bill,
+  BillContent,
+  MiraiStance,
+  HouseEnum,
+  BillStatusEnum,
+  BillPublishStatus,
+};
 
-export type BillContent = Database["public"]["Tables"]["bill_contents"]["Row"];
-export type BillContentInsert =
-  Database["public"]["Tables"]["bill_contents"]["Insert"];
-export type BillContentUpdate =
-  Database["public"]["Tables"]["bill_contents"]["Update"];
+export type BillInsert = Omit<Bill, "id" | "created_at" | "updated_at">;
+export type BillUpdate = Partial<BillInsert>;
 
-export type MiraiStance = Database["public"]["Tables"]["mirai_stances"]["Row"];
+export type BillContentInsert = Omit<
+  BillContent,
+  "id" | "created_at" | "updated_at"
+>;
+export type BillContentUpdate = Partial<BillContentInsert>;
 
-// Enums
-export type HouseEnum = Database["public"]["Enums"]["house_enum"];
-export type BillStatusEnum = Database["public"]["Enums"]["bill_status_enum"];
-export type StanceTypeEnum = Database["public"]["Enums"]["stance_type_enum"];
-
-// 公開ステータス型（議案の公開/非公開を管理）
-export type BillPublishStatus = "draft" | "published" | "coming_soon";
+export type StanceTypeEnum =
+  | "for"
+  | "against"
+  | "neutral"
+  | "conditional_for"
+  | "conditional_against"
+  | "considering"
+  | "continued_deliberation";
 
 // Coming Soon議案の型（最小限の情報のみ）
 export type ComingSoonBill = {
@@ -73,25 +86,32 @@ export function getBillStatusLabel(
   switch (status) {
     case "preparing":
       return "準備中";
+    case "coming_soon":
+      return "近日公開";
     case "introduced":
       return "提出済み";
     case "in_originating_house":
       if (originatingHouse) {
         return `${HOUSE_LABELS[originatingHouse]}審議中`;
       }
-      return "審議中"; // フォールバック
+      return "審議中";
     case "in_receiving_house":
+    case "in_other_house":
       if (originatingHouse) {
         const receivingHouse = originatingHouse === "HR" ? "HC" : "HR";
         return `${HOUSE_LABELS[receivingHouse]}審議中`;
       }
-      return "審議中"; // フォールバック
+      return "審議中";
     case "enacted":
       return "成立";
     case "rejected":
       return "否決";
+    case "withdrawn":
+      return "撤回";
+    case "continued":
+      return "継続審議";
     default:
-      return status; // 未知のステータスはそのまま返す
+      return status;
   }
 }
 

@@ -1,8 +1,22 @@
-import type { Database } from "@mirai-gikai/supabase";
 import { z } from "zod";
 
-export type MiraiStance = Database["public"]["Tables"]["mirai_stances"]["Row"];
-export type StanceTypeEnum = Database["public"]["Enums"]["stance_type_enum"];
+export type StanceTypeEnum =
+  | "for"
+  | "against"
+  | "neutral"
+  | "conditional_for"
+  | "conditional_against"
+  | "considering"
+  | "continued_deliberation";
+
+export interface MiraiStance {
+  id: string;
+  bill_id: string;
+  type: StanceTypeEnum;
+  comment?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
 
 // フォーム入力用の型とスキーマ
 export const stanceInputSchema = z.object({

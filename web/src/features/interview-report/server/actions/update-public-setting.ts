@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { verifySessionOwnership } from "@/features/interview-session/server/utils/verify-session-ownership";
 
 interface UpdatePublicSettingResult {
@@ -21,17 +21,16 @@ export async function updatePublicSetting(
     return { success: false, error: ownershipResult.error };
   }
 
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
+    await db.collection("interview_sessions").doc(sessionId).update({
+      is_public_by_user: isPublic,
+      updated_at: new Date().toISOString(),
+    });
 
-  const { error: updateError } = await supabase
-    .from("interview_sessions")
-    .update({ is_public_by_user: isPublic })
-    .eq("id", sessionId);
-
-  if (updateError) {
+    return { success: true };
+  } catch (updateError) {
     console.error("Failed to update public setting:", updateError);
     return { success: false, error: "公開設定の更新に失敗しました" };
   }
-
-  return { success: true };
 }

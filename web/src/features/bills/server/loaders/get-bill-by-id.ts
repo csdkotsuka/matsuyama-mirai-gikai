@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { getDifficultyLevel } from "@/features/bill-difficulty/server/loaders/get-difficulty-level";
 import type { DifficultyLevelEnum } from "@/features/bill-difficulty/shared/types";
@@ -7,7 +7,6 @@ import type { BillWithContent } from "../../shared/types";
 import { getBillContentWithDifficulty } from "./helpers/get-bill-content";
 
 export async function getBillById(id: string): Promise<BillWithContent | null> {
-  // キャッシュ外でcookiesにアクセス
   const difficultyLevel = await getDifficultyLevel();
   return _getCachedBillById(id, difficultyLevel);
 }
@@ -17,49 +16,61 @@ const _getCachedBillById = unstable_cache(
     id: string,
     difficultyLevel: DifficultyLevelEnum
   ): Promise<BillWithContent | null> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
 
-    // 基本的なbill情報、見解、コンテンツ、タグを並列取得
-    // 公開ステータスの議案のみを取得
-    const [billResult, miraiStanceResult, billContent, tagsResult] =
-      await Promise.all([
-        supabase
-          .from("bills")
-          .select("*")
-          .eq("id", id)
-          .eq("publish_status", "published") // 公開済み議案のみ
-          .single(),
-        supabase.from("mirai_stances").select("*").eq("bill_id", id).single(),
+      const [billDoc, stanceSnap, billContent, tagsSnap] = await Promise.all([
+        db.collection("bills").doc(id).get(),
+        db
+          .collection("mirai_stances")
+          .where("bill_id", "==", id)
+          .limit(1)
+          .get(),
         getBillContentWithDifficulty(id, difficultyLevel),
-        supabase.from("bills_tags").select("tags(id, label)").eq("bill_id", id),
+        db.collection("tags").get(),
       ]);
 
-    const { data: bill, error: billError } = billResult;
-    if (billError || !bill) {
-      console.error("Failed to fetch bill:", billError);
+      if (!billDoc.exists) {
+        return null;
+      }
+
+      const billData = billDoc.data()!;
+      // 公開済み議案のみ
+      if (billData.publish_status !== "published") {
+        return null;
+      }
+
+      const miraiStance = !stanceSnap.empty
+        ? ({ id: stanceSnap.docs[0].id, ...stanceSnap.docs[0].data() } as any)
+        : undefined;
+
+      const tagMap = new Map<string, { id: string; label: string }>();
+      tagsSnap.docs.forEach((doc: any) => {
+        tagMap.set(doc.id, { id: doc.id, label: doc.data().label });
+      });
+
+      const tagIds: string[] = Array.isArray(billData.tag_ids)
+        ? billData.tag_ids
+        : [];
+      const tags = tagIds
+        .map((tagId) => tagMap.get(tagId))
+        .filter(Boolean) as Array<{ id: string; label: string }>;
+
+      return {
+        id: billDoc.id,
+        ...billData,
+        mirai_stance: miraiStance,
+        bill_content: billContent || undefined,
+        tags,
+      } as BillWithContent;
+    } catch (error) {
+      console.error("Failed to fetch bill:", error);
       return null;
     }
-
-    const { data: miraiStance } = miraiStanceResult;
-    const { data: billTags } = tagsResult;
-
-    // タグデータを整形
-    const tags =
-      billTags
-        ?.map((bt) => bt.tags)
-        .filter((tag): tag is { id: string; label: string } => tag !== null) ||
-      [];
-
-    return {
-      ...bill,
-      mirai_stance: miraiStance || undefined,
-      bill_content: billContent || undefined,
-      tags,
-    };
   },
   ["bill-by-id"],
   {
-    revalidate: 600, // 10分（600秒）
+    revalidate: 600,
     tags: [CACHE_TAGS.BILLS],
   }
 );

@@ -1,5 +1,4 @@
 import { google } from "@ai-sdk/google";
-import type { Database } from "@mirai-gikai/supabase";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import type { DifficultyLevelEnum } from "@/features/bill-difficulty/shared/types";
 import type { BillWithContent } from "@/features/bills/shared/types";
@@ -27,8 +26,7 @@ type ChatRequestParams = {
   userId: string;
 };
 
-type ChatUsageMetadata =
-  Database["public"]["Tables"]["chat_usage_events"]["Insert"]["metadata"];
+type ChatUsageMetadata = Record<string, any>;
 
 /**
  * チャットリクエストを処理してストリーミングレスポンスを返す
@@ -154,11 +152,11 @@ async function buildPrompt(
     context.pageContext?.type === "home"
       ? { billSummary: JSON.stringify(context.pageContext.bills ?? "") }
       : {
-        billName: context.billContext?.name ?? "",
-        billTitle: context.billContext?.bill_content?.title ?? "",
-        billSummary: context.billContext?.bill_content?.summary ?? "",
-        billContent: context.billContext?.bill_content?.content ?? "",
-      };
+          billName: context.billContext?.name ?? "",
+          billTitle: context.billContext?.bill_content?.title ?? "",
+          billSummary: context.billContext?.bill_content?.summary ?? "",
+          billContent: context.billContext?.bill_content?.content ?? "",
+        };
 
   // Fetch prompt from Langfuse
   try {

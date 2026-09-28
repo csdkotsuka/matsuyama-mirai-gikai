@@ -15,7 +15,7 @@ export function useLogin() {
       setError(null);
 
       await signIn(data.email, data.password);
-      router.push("/bills");
+      window.location.href = "/bills";
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);

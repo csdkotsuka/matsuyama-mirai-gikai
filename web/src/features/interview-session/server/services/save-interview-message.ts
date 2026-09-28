@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 
 interface SaveInterviewMessageParams {
   sessionId: string;
@@ -16,16 +16,19 @@ export async function saveInterviewMessage({
   role,
   content,
 }: SaveInterviewMessageParams): Promise<void> {
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
 
-  const { error } = await supabase.from("interview_messages").insert({
-    interview_session_id: sessionId,
-    role,
-    content,
-  });
-
-  if (error) {
+    await db.collection("interview_messages").add({
+      interview_session_id: sessionId,
+      role,
+      content,
+      created_at: new Date().toISOString(),
+    });
+  } catch (error: any) {
     console.error("Failed to save interview message:", error);
-    throw new Error(`Failed to save interview message: ${error.message}`);
+    throw new Error(
+      `Failed to save interview message: ${error?.message || error}`
+    );
   }
 }

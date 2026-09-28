@@ -1,4 +1,4 @@
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { getDifficultyLevel } from "@/features/bill-difficulty/server/loaders/get-difficulty-level";
 import type { BillWithContent } from "../../shared/types";
 import { getBillContentWithDifficulty } from "./helpers/get-bill-content";
@@ -12,38 +12,46 @@ export async function getBillByIdAdmin(
   id: string
 ): Promise<BillWithContent | null> {
   const difficultyLevel = await getDifficultyLevel();
-  const supabase = createAdminClient();
+  try {
+    const db = getAdminFirestore();
 
-  // 基本的なbill情報、見解、コンテンツ、タグを並列取得
-  // ステータスに関係なく取得（管理者用）
-  const [billResult, miraiStanceResult, billContent, tagsResult] =
-    await Promise.all([
-      supabase.from("bills").select("*").eq("id", id).single(),
-      supabase.from("mirai_stances").select("*").eq("bill_id", id).single(),
+    const [billDoc, stanceSnap, billContent, tagsSnap] = await Promise.all([
+      db.collection("bills").doc(id).get(),
+      db.collection("mirai_stances").where("bill_id", "==", id).limit(1).get(),
       getBillContentWithDifficulty(id, difficultyLevel),
-      supabase.from("bills_tags").select("tags(id, label)").eq("bill_id", id),
+      db.collection("tags").get(),
     ]);
 
-  const { data: bill, error: billError } = billResult;
-  if (billError || !bill) {
-    console.error("Failed to fetch bill:", billError);
+    if (!billDoc.exists) {
+      return null;
+    }
+
+    const billData = billDoc.data()!;
+    const miraiStance = !stanceSnap.empty
+      ? ({ id: stanceSnap.docs[0].id, ...stanceSnap.docs[0].data() } as any)
+      : undefined;
+
+    const tagMap = new Map<string, { id: string; label: string }>();
+    tagsSnap.docs.forEach((doc: any) => {
+      tagMap.set(doc.id, { id: doc.id, label: doc.data().label });
+    });
+
+    const tagIds: string[] = Array.isArray(billData.tag_ids)
+      ? billData.tag_ids
+      : [];
+    const tags = tagIds
+      .map((tagId) => tagMap.get(tagId))
+      .filter(Boolean) as Array<{ id: string; label: string }>;
+
+    return {
+      id: billDoc.id,
+      ...billData,
+      mirai_stance: miraiStance,
+      bill_content: billContent || undefined,
+      tags,
+    } as BillWithContent;
+  } catch (error) {
+    console.error("Failed to fetch bill (admin):", error);
     return null;
   }
-
-  const { data: miraiStance } = miraiStanceResult;
-  const { data: billTags } = tagsResult;
-
-  // タグデータを整形
-  const tags =
-    billTags
-      ?.map((bt) => bt.tags)
-      .filter((tag): tag is { id: string; label: string } => tag !== null) ??
-    [];
-
-  return {
-    ...bill,
-    mirai_stance: miraiStance || undefined,
-    bill_content: billContent || undefined,
-    tags,
-  };
 }

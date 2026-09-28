@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
 import {
@@ -24,42 +24,46 @@ export async function updateBillContents(
     // バリデーション
     const validatedData = billContentsUpdateSchema.parse(input);
 
-    // Supabaseで更新
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
 
-    // 各難易度レベルのupsertを並行実行
-    const upsertPromises = (["normal", "hard"] as DifficultyLevel[]).map(
-      async (difficulty) => {
-        const data = validatedData[difficulty];
+    // 各難易度レベルのupsert
+    for (const difficulty of ["normal", "hard"] as DifficultyLevel[]) {
+      const data = validatedData[difficulty];
 
-        // 空のコンテンツの場合はスキップ（削除も行わない）
-        if (!data.title && !data.summary && !data.content) {
-          return;
-        }
-
-        const { error } = await supabase.from("bill_contents").upsert(
-          {
-            bill_id: billId,
-            difficulty_level: difficulty,
-            title: data.title || "",
-            summary: data.summary || "",
-            content: data.content || "",
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "bill_id,difficulty_level",
-          }
-        );
-
-        if (error) {
-          throw new Error(
-            `議案コンテンツ（${difficulty}）のupsertに失敗しました: ${error.message}`
-          );
-        }
+      // 空のコンテンツの場合はスキップ
+      if (!data.title && !data.summary && !data.content) {
+        continue;
       }
-    );
 
-    await Promise.all(upsertPromises);
+      // 既存のコンテンツを探す
+      const existingQuery = await db
+        .collection("bill_contents")
+        .where("bill_id", "==", billId)
+        .where("difficulty_level", "==", difficulty)
+        .limit(1)
+        .get();
+
+      const now = new Date().toISOString();
+      const contentData = {
+        bill_id: billId,
+        difficulty_level: difficulty,
+        title: data.title || "",
+        summary: data.summary || "",
+        content: data.content || "",
+        updated_at: now,
+      };
+
+      if (!existingQuery.empty) {
+        await existingQuery.docs[0].ref.update(contentData);
+      } else {
+        const newDocRef = db.collection("bill_contents").doc();
+        await newDocRef.set({
+          ...contentData,
+          id: newDocRef.id,
+          created_at: now,
+        });
+      }
+    }
 
     // web側のキャッシュを無効化
     await invalidateWebCache();

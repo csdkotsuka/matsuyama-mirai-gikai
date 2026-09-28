@@ -1,41 +1,34 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { checkAdminPermission } from "@/lib/auth/permissions";
-import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  const { supabaseResponse, user } = await updateSession(request);
+  const sessionCookie = request.cookies.get("__session")?.value;
+  const isLoginPage = request.nextUrl.pathname === "/login";
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
 
-  // ログインページへのアクセスで、既にログイン済みの場合
-  if (request.nextUrl.pathname === "/login") {
-    if (user && checkAdminPermission(user)) {
+  // APIルートはミドルウェアをスキップ
+  if (isApiRoute) {
+    return NextResponse.next();
+  }
+
+  // ログインページへのアクセスで、すでにセッションCookieがある場合
+  if (isLoginPage) {
+    if (sessionCookie) {
       const url = request.nextUrl.clone();
       url.pathname = "/bills";
       return NextResponse.redirect(url);
     }
-    // ログインページは常にアクセス可能
-    return supabaseResponse;
+    return NextResponse.next();
   }
 
-  // 保護されたルートへのアクセス
-  // 未認証の場合
-  if (!user) {
+  // 保護されたルートへのアクセスで、セッションCookieがない場合
+  if (!sessionCookie) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // admin権限チェック
-  if (!checkAdminPermission(user)) {
-    // 権限がない場合もログイン画面へ
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("error", "unauthorized");
-    return NextResponse.redirect(url);
-  }
-
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {

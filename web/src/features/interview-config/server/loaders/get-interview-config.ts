@@ -1,10 +1,9 @@
-import type { Database } from "@mirai-gikai/supabase";
-import { createAdminClient } from "@mirai-gikai/supabase";
+import type { InterviewConfig } from "@mirai-gikai/firebase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { unstable_cache } from "next/cache";
 import { CACHE_TAGS } from "@/lib/cache-tags";
 
-export type InterviewConfig =
-  Database["public"]["Tables"]["interview_configs"]["Row"];
+export type { InterviewConfig };
 
 export async function getInterviewConfig(
   billId: string
@@ -14,25 +13,28 @@ export async function getInterviewConfig(
 
 const _getCachedInterviewConfig = unstable_cache(
   async (billId: string): Promise<InterviewConfig | null> => {
-    const supabase = createAdminClient();
+    try {
+      const db = getAdminFirestore();
+      const snapshot = await db
+        .collection("interview_configs")
+        .where("bill_id", "==", billId)
+        .where("status", "==", "public")
+        .limit(1)
+        .get();
 
-    const { data, error } = await supabase
-      .from("interview_configs")
-      .select("*")
-      .eq("bill_id", billId)
-      .eq("status", "public") // 公開ステータスのみ
-      .single();
-
-    if (error) {
-      // レコードが存在しない場合はnullを返す（エラーではない）
-      if (error.code === "PGRST116") {
+      if (snapshot.empty) {
         return null;
       }
+
+      const doc = snapshot.docs[0];
+      return {
+        id: doc.id,
+        ...doc.data(),
+      } as InterviewConfig;
+    } catch (error) {
       console.error("Failed to fetch interview config:", error);
       return null;
     }
-
-    return data;
   },
   ["interview-config"],
   {

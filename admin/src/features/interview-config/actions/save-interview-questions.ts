@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient } from "@mirai-gikai/supabase";
+import { getAdminFirestore } from "@mirai-gikai/firebase";
 import { requireAdmin } from "@/features/auth/lib/auth-server";
 import { invalidateWebCache } from "@/lib/utils/cache-invalidation";
 import {
@@ -22,46 +22,36 @@ export async function saveInterviewQuestions(
     // バリデーション
     const validatedQuestions = interviewQuestionsInputSchema.parse(questions);
 
-    const supabase = createAdminClient();
+    const db = getAdminFirestore();
 
     // 既存の質問を全て削除
-    const { error: deleteError } = await supabase
-      .from("interview_questions")
-      .delete()
-      .eq("interview_config_id", interviewConfigId);
+    const existingSnap = await db
+      .collection("interview_questions")
+      .where("interview_config_id", "==", interviewConfigId)
+      .get();
 
-    if (deleteError) {
-      return {
-        success: false,
-        error: `既存の質問の削除に失敗しました: ${deleteError.message}`,
-      };
-    }
+    const batch = db.batch();
+    existingSnap.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
 
-    // 質問が空の場合はここで終了
-    if (validatedQuestions.length === 0) {
-      await invalidateWebCache();
-      return { success: true };
-    }
+    // 新しい質問を一括挿入
+    const now = new Date().toISOString();
+    validatedQuestions.forEach((question, index) => {
+      const docRef = db.collection("interview_questions").doc();
+      batch.set(docRef, {
+        id: docRef.id,
+        interview_config_id: interviewConfigId,
+        question: question.question,
+        instruction: question.instruction || null,
+        quick_replies: question.quick_replies || null,
+        question_order: index + 1,
+        created_at: now,
+        updated_at: now,
+      });
+    });
 
-    // 新しい質問を一括挿入（question_orderは自動採番）
-    const questionsToInsert = validatedQuestions.map((question, index) => ({
-      interview_config_id: interviewConfigId,
-      question: question.question,
-      instruction: question.instruction || null,
-      quick_replies: question.quick_replies || null,
-      question_order: index + 1,
-    }));
-
-    const { error: insertError } = await supabase
-      .from("interview_questions")
-      .insert(questionsToInsert);
-
-    if (insertError) {
-      return {
-        success: false,
-        error: `質問の保存に失敗しました: ${insertError.message}`,
-      };
-    }
+    await batch.commit();
 
     // web側のキャッシュを無効化
     await invalidateWebCache();

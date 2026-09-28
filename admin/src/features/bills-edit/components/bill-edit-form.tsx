@@ -58,7 +58,10 @@ export function BillEditForm({ bill, dietSessions }: BillEditFormProps) {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit as any)}
+            className="space-y-6"
+          >
             <BillFormFields
               control={form.control}
               billId={bill.id}
