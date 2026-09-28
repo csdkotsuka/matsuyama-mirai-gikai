@@ -50,6 +50,6 @@ export async function loadTags(): Promise<TagWithBillCount[]> {
     return tags;
   } catch (error: any) {
     console.error("Failed to load tags:", error);
-    throw new Error(`タグの取得に失敗しました: ${error.message}`);
+    return [];
   }
 }

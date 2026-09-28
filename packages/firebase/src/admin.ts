@@ -9,26 +9,50 @@ export function getFirebaseAdminApp(): admin.app.App {
     return admin.apps[0]!;
   }
 
-  const candidatePaths = [
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
-    path.resolve(process.cwd(), "service-account.json"),
-    path.resolve(process.cwd(), "../service-account.json"),
-    path.resolve(process.cwd(), "../../service-account.json"),
-    path.resolve(__dirname, "../../../service-account.json"),
-    path.resolve(__dirname, "../../../../service-account.json"),
-  ].filter(Boolean) as string[];
-
   let serviceAccount: any = null;
 
+  // 1. Check FIREBASE_SERVICE_ACCOUNT_KEY (raw JSON or base64)
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY.trim();
     try {
-      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      if (raw.startsWith("{")) {
+        serviceAccount = JSON.parse(raw);
+      } else {
+        const decoded = Buffer.from(raw, "base64").toString("utf-8");
+        serviceAccount = JSON.parse(decoded);
+      }
     } catch (e) {
-      console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY JSON:", e);
+      console.warn("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY:", e);
     }
   }
 
+  // 2. Check individual credentials (FIREBASE_CLIENT_EMAIL & FIREBASE_PRIVATE_KEY)
+  if (
+    !serviceAccount &&
+    process.env.FIREBASE_CLIENT_EMAIL &&
+    process.env.FIREBASE_PRIVATE_KEY
+  ) {
+    serviceAccount = {
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      project_id:
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+        "miraigikai",
+    };
+  }
+
+  // 3. Check candidate file paths
   if (!serviceAccount) {
+    const candidatePaths = [
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
+      path.resolve(process.cwd(), "service-account.json"),
+      path.resolve(process.cwd(), "../service-account.json"),
+      path.resolve(process.cwd(), "../../service-account.json"),
+      path.resolve(__dirname, "../../../service-account.json"),
+      path.resolve(__dirname, "../../../../service-account.json"),
+    ].filter(Boolean) as string[];
+
     for (const p of candidatePaths) {
       if (fs.existsSync(p)) {
         try {
@@ -54,14 +78,32 @@ export function getFirebaseAdminApp(): admin.app.App {
   }
 
   // Fallback to application default credentials / env
-  initializedApp = admin.initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID || "miraigikai",
-    storageBucket:
-      process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-      "miraigikai.firebasestorage.app",
-  });
-
-  return initializedApp;
+  try {
+    initializedApp = admin.initializeApp({
+      projectId:
+        process.env.FIREBASE_PROJECT_ID ||
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+        "miraigikai",
+      storageBucket:
+        process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+        "miraigikai.firebasestorage.app",
+    });
+    return initializedApp;
+  } catch (err) {
+    console.warn(
+      "Failed to initialize Firebase Admin with default credentials:",
+      err
+    );
+    return admin.initializeApp(
+      {
+        projectId:
+          process.env.FIREBASE_PROJECT_ID ||
+          process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+          "miraigikai",
+      },
+      "build-fallback"
+    );
+  }
 }
 
 export function getAdminFirestore() {

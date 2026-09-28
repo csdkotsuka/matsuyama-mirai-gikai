@@ -14,6 +14,6 @@ export async function getBills(): Promise<Bill[]> {
     }));
   } catch (error: any) {
     console.error("Failed to get bills:", error);
-    throw new Error(`議案の取得に失敗しました: ${error.message}`);
+    return [];
   }
 }

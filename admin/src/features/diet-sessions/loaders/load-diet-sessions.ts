@@ -24,6 +24,6 @@ export async function loadDietSessions(): Promise<DietSession[]> {
     });
   } catch (error: any) {
     console.error("Failed to load diet sessions:", error);
-    throw new Error(`国会会期の取得に失敗しました: ${error.message}`);
+    return [];
   }
 }
