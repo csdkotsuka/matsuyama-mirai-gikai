@@ -6,6 +6,7 @@
   "scripts": {
     "seed": "tsx ../../scripts/seed-firestore.ts",
     "seed:admin": "tsx ../../scripts/create-admin-user.ts",
+    "seed:councils": "tsx ../../scripts/seed-councils-data.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

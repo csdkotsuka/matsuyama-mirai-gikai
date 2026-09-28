@@ -23,7 +23,7 @@ export function HeaderClient({ difficultyLevel }: HeaderClientProps) {
       <div className="rounded-2xl bg-white shadow-sm mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo / Site Title */}
-          <div className="flex items-center">
+          <div className="flex items-center space-x-6">
             <Link
               href="/"
               className="flex items-center space-x-2"
@@ -37,6 +37,29 @@ export function HeaderClient({ difficultyLevel }: HeaderClientProps) {
               />
               <div className="text-xl font-bold">松山みらい議会</div>
             </Link>
+
+            <div className="hidden md:flex items-center space-x-4 text-sm font-medium">
+              <Link
+                href="/councils"
+                className={`transition-colors ${
+                  pathname.startsWith("/councils")
+                    ? "text-primary font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                地方議会
+              </Link>
+              <Link
+                href="/politicians"
+                className={`transition-colors ${
+                  pathname.startsWith("/politicians")
+                    ? "text-primary font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                議員・発言まとめ
+              </Link>
+            </div>
           </div>
 
           {/* Navigation */}

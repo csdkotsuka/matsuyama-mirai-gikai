@@ -8,7 +8,7 @@ import type { CompiledPrompt, PromptVariables } from "../interface/types";
 export class FallbackPromptProvider implements PromptProvider {
   async getPrompt(
     name: string,
-    variables?: PromptVariables
+    _variables?: PromptVariables
   ): Promise<CompiledPrompt> {
     // デフォルトのプロンプトを返す
     const defaultPrompts: Record<string, string> = {

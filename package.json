@@ -9,6 +9,7 @@
     "dev": "dotenv -e .env -- pnpm -r --stream --parallel run dev",
     "seed": "dotenv -e .env -- pnpm --filter @mirai-gikai/seed seed",
     "seed:admin": "dotenv -e .env -- pnpm --filter @mirai-gikai/seed seed:admin",
+    "seed:councils": "dotenv -e .env -- pnpm --filter @mirai-gikai/seed seed:councils",
     "test": "pnpm -r --parallel run test",
     "typecheck": "pnpm -r run typecheck",
     "lint": "biome format . && biome lint .",
